@@ -33,58 +33,66 @@ const TICKER_ITEMS = [
   '🔔 BAKER HUGHES RIG COUNT: Friday 18:00 UTC',
 ];
 
+const TICKER_STRING = TICKER_ITEMS.join('     ·     ');
+
 export default async function TerminalPage() {
   const initialPrices = await getInitialPrices();
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#030810]">
+    <div className="flex flex-col h-screen overflow-hidden bg-terminal-bg transition-colors duration-300">
+
       {/* ── Top bar: Price strip ───────────────────── */}
-      <div className="shrink-0 h-[58px]">
+      <div className="shrink-0 h-[60px] border-b border-terminal-border">
         <PriceStrip initialPrices={initialPrices} />
       </div>
 
       {/* ── Main body: 3-column grid ───────────────── */}
-      <div className="flex-1 min-h-0 grid grid-cols-[300px_1fr_300px] gap-0 overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-cols-[300px_1fr_300px] overflow-hidden">
+
         {/* Left: News feed */}
-        <div className="panel border-r border-terminal-border overflow-hidden">
+        <div className="panel border-r border-terminal-border overflow-hidden flex flex-col">
           <NewsFeed />
         </div>
 
         {/* Center: World map + chart stacked */}
         <div className="flex flex-col overflow-hidden border-r border-terminal-border">
-          {/* World map takes ~62% of center height */}
+          {/* World map ~62% */}
           <div className="flex-[62] min-h-0 panel border-b border-terminal-border">
             <WorldMap />
           </div>
-          {/* Price chart takes ~38% */}
+          {/* Price chart ~38% */}
           <div className="flex-[38] min-h-0 panel">
             <PriceChart />
           </div>
         </div>
 
         {/* Right: Threat matrix */}
-        <div className="panel overflow-hidden">
+        <div className="panel overflow-hidden flex flex-col">
           <ThreatMatrix />
         </div>
       </div>
 
       {/* ── Bottom: Alert ticker ───────────────────── */}
-      <div className="shrink-0 h-6 border-t border-terminal-border bg-terminal-panel flex items-center overflow-hidden">
-        <div className="shrink-0 px-2 border-r border-terminal-border h-full flex items-center">
-          <span className="text-[8px] font-['Orbitron'] text-terminal-red font-bold tracking-wider animate-pulse">
-            ● LIVE
+      <div className="shrink-0 h-7 border-t border-terminal-border bg-terminal-surface flex items-center overflow-hidden">
+        {/* LIVE badge */}
+        <div className="shrink-0 px-3 border-r border-terminal-border h-full flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-terminal-red animate-pulse" />
+          <span className="text-[9px] font-['Orbitron'] text-terminal-red font-bold tracking-wider">
+            LIVE
           </span>
         </div>
+
+        {/* Scrolling text */}
         <div className="flex-1 overflow-hidden relative">
-          <div className="ticker-text text-[9px] text-terminal-dim">
-            {TICKER_ITEMS.join('   ·   ')}
-            &nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;
-            {TICKER_ITEMS.join('   ·   ')}
+          <div className="ticker-text text-[10px] text-terminal-text font-medium">
+            {TICKER_STRING}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{TICKER_STRING}
           </div>
         </div>
-        <div className="shrink-0 px-2 border-l border-terminal-border h-full flex items-center">
-          <span className="text-[8px] text-terminal-dim tabular-nums" suppressHydrationWarning>
-            OIL SENTINEL v2.0
+
+        {/* Version */}
+        <div className="shrink-0 px-3 border-l border-terminal-border h-full flex items-center">
+          <span className="text-[9px] text-terminal-dim font-['Orbitron'] tracking-wider tabular-nums">
+            OIL SENTINEL v2.1
           </span>
         </div>
       </div>

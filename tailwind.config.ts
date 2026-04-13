@@ -6,25 +6,31 @@ const config: Config = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
         terminal: {
-          bg:       '#030810',
-          panel:    '#050d1a',
-          border:   '#0d2238',
-          blue:     '#00d4ff',
-          green:    '#00ff88',
-          amber:    '#ffaa00',
-          red:      '#ff3344',
-          dim:      '#3a6080',
-          text:     '#8ab8d0',
-          bright:   '#d0eaf8',
-          muted:    '#1e3a52',
+          bg:     'var(--bg)',
+          panel:  'var(--panel)',
+          border: 'var(--border)',
+          blue:   'var(--blue)',
+          green:  'var(--green)',
+          amber:  'var(--amber)',
+          red:    'var(--red)',
+          dim:    'var(--dim)',
+          text:   'var(--text)',
+          bright: 'var(--bright)',
+          muted:  'var(--muted)',
+          // accent helpers
+          'accent-blue':  'var(--accent-blue)',
+          'accent-green': 'var(--accent-green)',
+          'surface':      'var(--surface)',
+          'surface2':     'var(--surface2)',
         },
       },
       fontFamily: {
-        mono: ['var(--font-mono)', 'JetBrains Mono', 'Courier New', 'monospace'],
+        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
       },
       animation: {
         'ping-slow':  'ping 2s cubic-bezier(0,0,0.2,1) infinite',
@@ -40,8 +46,8 @@ const config: Config = {
           '100%': { transform: 'translateX(-100%)' },
         },
         glow: {
-          from: { textShadow: '0 0 5px #00d4ff, 0 0 10px #00d4ff' },
-          to:   { textShadow: '0 0 10px #00d4ff, 0 0 20px #00d4ff, 0 0 30px #00d4ff' },
+          from: { textShadow: '0 0 5px var(--blue), 0 0 10px var(--blue)' },
+          to:   { textShadow: '0 0 10px var(--blue), 0 0 20px var(--blue), 0 0 30px var(--blue)' },
         },
         scanline: {
           '0%':   { transform: 'translateY(-100%)' },
@@ -53,6 +59,9 @@ const config: Config = {
         'glow-green': '0 0 20px rgba(0,255,136,0.15)',
         'glow-red':   '0 0 20px rgba(255,51,68,0.2)',
         'panel':      'inset 0 1px 0 rgba(0,212,255,0.1)',
+      },
+      transitionProperty: {
+        'theme': 'background-color, border-color, color',
       },
     },
   },
