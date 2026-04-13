@@ -4,6 +4,11 @@ import type { CommodityPrice } from '@/lib/types';
 
 interface Props { initialPrices: CommodityPrice[] }
 
+// Simulated daily H/L range offset (% of price) — gives visual depth
+const HL_SPREAD: Record<string, number> = {
+  BRT: 0.018, WTI: 0.019, HH: 0.025, TTF: 0.022, GO: 0.016, HFO: 0.014,
+};
+
 export default function PriceStrip({ initialPrices }: Props) {
   const [prices, setPrices] = useState<CommodityPrice[]>(initialPrices);
   const [time, setTime] = useState('');
@@ -29,7 +34,7 @@ export default function PriceStrip({ initialPrices }: Props) {
         });
         setFlashes(newFlashes);
         setPrices(d.prices);
-        setTimeout(() => setFlashes({}), 700);
+        setTimeout(() => setFlashes({}), 800);
       } catch { /* keep stale */ }
     };
     const pi = setInterval(fetchPrices, 30_000);
@@ -41,63 +46,91 @@ export default function PriceStrip({ initialPrices }: Props) {
     : 0;
 
   return (
-    <div className="flex items-stretch h-full border-b border-terminal-border bg-terminal-bg">
+    <div className="flex items-stretch h-full border-b border-terminal-border bg-[#030810]">
       {/* Logo */}
-      <div className="flex items-center px-4 border-r border-terminal-border min-w-fit gap-2">
-        <div className="w-2 h-2 rounded-full bg-terminal-green shadow-glow-green animate-pulse" />
-        <span className="font-['Orbitron'] text-[10px] tracking-widest text-terminal-bright font-bold glow-blue">
-          OIL SENTINEL
-        </span>
-        <span className="text-terminal-dim text-[9px]">TERMINAL</span>
-        <div className="text-[8px] text-terminal-dim border border-terminal-muted px-1 rounded">LIVE</div>
-      </div>
-
-      {/* Prices */}
-      <div className="flex items-center gap-0 overflow-x-auto flex-1">
-        {prices.map(p => (
-          <div
-            key={p.symbol}
-            className={`flex flex-col justify-center px-3 border-r border-terminal-border h-full min-w-[100px] transition-colors
-              ${flashes[p.symbol] === 'up' ? 'bg-terminal-green/10' : flashes[p.symbol] === 'down' ? 'bg-terminal-red/10' : ''}`}
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="text-terminal-dim text-[9px] font-['Orbitron'] tracking-wider">{p.symbol}</span>
-              {p.trend !== 'flat' && (
-                <span className={p.trend === 'up' ? 'value-up text-[8px]' : 'value-down text-[8px]'}>
-                  {p.trend === 'up' ? '▲' : '▼'}
-                </span>
-              )}
-            </div>
-            <div className={`text-[13px] font-bold leading-tight ${p.trend === 'up' ? 'value-up' : p.trend === 'down' ? 'value-down' : 'text-terminal-bright'}`}>
-              ${p.price.toFixed(2)}
-            </div>
-            <div className={`text-[9px] ${p.changePct >= 0 ? 'value-up' : 'value-down'}`}>
-              {p.changePct >= 0 ? '+' : ''}{p.changePct.toFixed(2)}%
-            </div>
+      <div className="flex items-center px-4 border-r border-terminal-border min-w-fit gap-2.5 shrink-0">
+        <div className="relative">
+          <div className="w-2.5 h-2.5 rounded-full bg-terminal-green shadow-glow-green animate-pulse" />
+        </div>
+        <div>
+          <div className="font-['Orbitron'] text-[11px] tracking-widest text-terminal-bright font-bold glow-blue leading-none">
+            OIL SENTINEL
           </div>
-        ))}
-
-        {/* Spread */}
-        <div className="flex flex-col justify-center px-3 border-r border-terminal-border h-full min-w-[90px]">
-          <div className="text-terminal-dim text-[9px] font-['Orbitron'] tracking-wider">BRT-WTI</div>
-          <div className="text-terminal-amber text-[13px] font-bold leading-tight">${brtWtiSpread.toFixed(2)}</div>
-          <div className="text-terminal-dim text-[9px]">SPREAD</div>
+          <div className="text-terminal-dim text-[8px] tracking-widest leading-none mt-0.5">TERMINAL  v2.0</div>
         </div>
       </div>
 
-      {/* Clock & Status */}
-      <div className="flex items-center gap-3 px-4 border-l border-terminal-border">
-        <div className="text-right">
-          <div className="text-terminal-dim text-[8px] tracking-wider">CLOCK</div>
-          <div className="text-terminal-blue text-[11px] font-bold glow-blue tabular-nums">{time}</div>
+      {/* Price tiles */}
+      <div className="flex items-center overflow-x-auto flex-1 min-w-0">
+        {prices.map(p => {
+          const spread = HL_SPREAD[p.symbol] ?? 0.018;
+          const hi = (p.price * (1 + spread)).toFixed(2);
+          const lo = (p.price * (1 - spread)).toFixed(2);
+          const flashClass = flashes[p.symbol] === 'up' ? 'flash-up' : flashes[p.symbol] === 'down' ? 'flash-down' : '';
+
+          return (
+            <div
+              key={p.symbol}
+              className={`flex flex-col justify-center px-3 border-r border-terminal-border h-full min-w-[110px] ${flashClass}`}
+            >
+              {/* Symbol + trend arrow */}
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="font-['Orbitron'] text-[8px] tracking-wider text-terminal-dim">{p.symbol}</span>
+                {p.trend !== 'flat' && (
+                  <span className={`text-[9px] font-bold ${p.trend === 'up' ? 'value-up' : 'value-down'}`}>
+                    {p.trend === 'up' ? '▲' : '▼'}
+                  </span>
+                )}
+              </div>
+              {/* Price — big and readable */}
+              <div className={`text-[16px] font-bold leading-none tabular-nums
+                ${p.trend === 'up' ? 'value-up' : p.trend === 'down' ? 'value-down' : 'text-terminal-bright'}`}>
+                ${p.price.toFixed(2)}
+              </div>
+              {/* Change % */}
+              <div className={`text-[9px] font-semibold mt-0.5 ${p.changePct >= 0 ? 'value-up' : 'value-down'}`}>
+                {p.changePct >= 0 ? '+' : ''}{p.changePct.toFixed(2)}%
+              </div>
+              {/* H/L */}
+              <div className="flex gap-1.5 text-[8px] mt-0.5">
+                <span className="text-terminal-dim">H</span>
+                <span className="text-terminal-text">{hi}</span>
+                <span className="text-terminal-dim">L</span>
+                <span className="text-terminal-text">{lo}</span>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* BRT-WTI Spread */}
+        <div className="flex flex-col justify-center px-3 border-r border-terminal-border h-full min-w-[100px]">
+          <div className="font-['Orbitron'] text-[8px] tracking-wider text-terminal-dim mb-0.5">BRT-WTI</div>
+          <div className="text-terminal-amber text-[16px] font-bold leading-none tabular-nums">
+            ${brtWtiSpread.toFixed(2)}
+          </div>
+          <div className="text-terminal-dim text-[8px] mt-0.5">SPREAD</div>
+          <div className="text-terminal-dim text-[8px]">
+            {brtWtiSpread > 3 ? 'CONTANGO' : brtWtiSpread > 1 ? 'NORMAL' : 'COMPRESSED'}
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-1 text-[8px] text-terminal-green">
+      </div>
+
+      {/* Clock + status */}
+      <div className="flex items-center gap-4 px-4 border-l border-terminal-border shrink-0">
+        <div className="text-right">
+          <div className="text-terminal-dim text-[8px] tracking-wider font-['Orbitron']">UTC</div>
+          <div className="text-terminal-blue text-[14px] font-bold glow-blue tabular-nums leading-tight"
+               suppressHydrationWarning>
+            {time}
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5 text-[9px] text-terminal-green">
             <div className="w-1.5 h-1.5 rounded-full bg-terminal-green animate-pulse" />
             FEEDS LIVE
           </div>
-          <div className="flex items-center gap-1 text-[8px] text-terminal-dim">
-            <div className="w-1.5 h-1.5 rounded-full bg-terminal-blue" />
+          <div className="flex items-center gap-1.5 text-[9px] text-terminal-dim">
+            <div className="w-1.5 h-1.5 rounded-full bg-terminal-blue opacity-70" />
             30s REFRESH
           </div>
         </div>

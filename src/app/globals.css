@@ -6,16 +6,16 @@
 
 :root {
   --bg:        #030810;
-  --panel:     #050d1a;
-  --border:    #0d2238;
+  --panel:     #060e1c;
+  --border:    #112840;
   --blue:      #00d4ff;
   --green:     #00ff88;
   --amber:     #ffaa00;
   --red:       #ff3344;
-  --dim:       #3a6080;
-  --text:      #8ab8d0;
-  --bright:    #d0eaf8;
-  --muted:     #1e3a52;
+  --dim:       #5a8aaa;
+  --text:      #a8cce0;
+  --bright:    #e2f4ff;
+  --muted:     #1a3a54;
 }
 
 * { box-sizing: border-box; }
@@ -24,7 +24,7 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 12px;
+  font-size: 13px;
   overflow: hidden;
   height: 100vh;
   width: 100vw;
@@ -33,15 +33,14 @@ html, body {
 /* ── Scrollbar ─────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: var(--panel); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--dim); }
 
 /* ── Panel style ───────────────── */
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-top: 1px solid rgba(0, 212, 255, 0.15);
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(0, 212, 255, 0.08);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(0, 212, 255, 0.1);
   position: relative;
   overflow: hidden;
 }
@@ -51,14 +50,15 @@ html, body {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.5), transparent);
+  z-index: 1;
 }
 
 /* ── Glow text ─────────────────── */
-.glow-blue  { text-shadow: 0 0 10px rgba(0, 212, 255, 0.8); }
-.glow-green { text-shadow: 0 0 10px rgba(0, 255, 136, 0.8); }
-.glow-red   { text-shadow: 0 0 10px rgba(255, 51,  68, 0.8); }
-.glow-amber { text-shadow: 0 0 10px rgba(255, 170,  0, 0.8); }
+.glow-blue  { text-shadow: 0 0 12px rgba(0, 212, 255, 0.9); }
+.glow-green { text-shadow: 0 0 12px rgba(0, 255, 136, 0.9); }
+.glow-red   { text-shadow: 0 0 12px rgba(255, 51,  68, 0.9); }
+.glow-amber { text-shadow: 0 0 12px rgba(255, 170,  0, 0.9); }
 
 /* ── Section header ────────────── */
 .section-header {
@@ -67,11 +67,12 @@ html, body {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--dim);
-  padding: 6px 10px 4px;
+  padding: 7px 10px 5px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .section-header .dot {
@@ -111,26 +112,95 @@ html, body {
 /* ── Price flash ───────────────── */
 @keyframes flash-green {
   0%, 100% { background: transparent; }
-  50%       { background: rgba(0, 255, 136, 0.15); }
+  50%       { background: rgba(0, 255, 136, 0.2); }
 }
 @keyframes flash-red {
   0%, 100% { background: transparent; }
-  50%       { background: rgba(255, 51, 68, 0.15); }
+  50%       { background: rgba(255, 51, 68, 0.2); }
 }
 
 .flash-up   { animation: flash-green 0.6s ease-in-out; }
 .flash-down { animation: flash-red 0.6s ease-in-out; }
 
 /* ── Map overlay ───────────────── */
-.rsm-geographies path {
-  outline: none;
+.rsm-geographies path { outline: none; }
+.rsm-geography { transition: fill 0.15s; cursor: pointer; }
+.rsm-geography:hover { fill: #1a3d5c !important; }
+.rsm-geography.selected { fill: #1d4a6e !important; }
+
+/* ── Map detail panel (slide-up) ── */
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
-.rsm-geography {
-  transition: fill 0.2s;
+
+.map-detail-panel {
+  animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(5, 15, 30, 0.97);
+  border: 1px solid var(--border);
+  border-top: 1px solid rgba(0, 212, 255, 0.4);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 212, 255, 0.08);
+  backdrop-filter: blur(12px);
 }
-.rsm-geography:hover {
-  fill: #162d42 !important;
-  cursor: pointer;
+
+/* ── Terminal tooltip ──────────── */
+.terminal-tooltip {
+  background: rgba(5, 15, 30, 0.96);
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  border-radius: 2px;
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ── Data grid ─────────────────── */
+.data-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+}
+
+.data-cell {
+  background: var(--panel);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.data-cell-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+}
+
+.data-cell-value {
+  font-size: 13px;
+  color: var(--bright);
+  font-weight: 600;
+}
+
+/* ── Status badges ─────────────── */
+.status-open       { color: #00ff88; }
+.status-elevated   { color: #ffaa00; }
+.status-disrupted  { color: #ff7722; }
+.status-critical   { color: #ff3344; }
+.status-closed     { color: #ff0022; text-shadow: 0 0 8px rgba(255,0,34,0.6); }
+
+/* ── Risk bar ──────────────────── */
+.risk-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.risk-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.8s ease;
 }
 
 /* ── Chart custom ──────────────── */
@@ -139,10 +209,10 @@ html, body {
 .recharts-legend-item-text { color: var(--text) !important; font-size: 10px !important; }
 
 /* ── Impact badge ──────────────── */
-.badge-flash    { background: rgba(255,51,68,0.15);  border: 1px solid rgba(255,51,68,0.4);  color: #ff3344; }
-.badge-analysis { background: rgba(255,170,0,0.12);  border: 1px solid rgba(255,170,0,0.3);  color: #ffaa00; }
-.badge-digest   { background: rgba(0,212,255,0.08);  border: 1px solid rgba(0,212,255,0.2);  color: #00d4ff; }
-.badge-none     { background: rgba(58,96,128,0.1);   border: 1px solid rgba(58,96,128,0.2);  color: #3a6080; }
+.badge-flash    { background: rgba(255,51,68,0.18);  border: 1px solid rgba(255,51,68,0.5);  color: #ff5566; }
+.badge-analysis { background: rgba(255,170,0,0.15);  border: 1px solid rgba(255,170,0,0.4);  color: #ffbb22; }
+.badge-digest   { background: rgba(0,212,255,0.10);  border: 1px solid rgba(0,212,255,0.3);  color: #22ddff; }
+.badge-none     { background: rgba(90,138,170,0.1);  border: 1px solid rgba(90,138,170,0.2); color: #5a8aaa; }
 
 /* ── Scanline effect ───────────── */
 .scanlines::after {
@@ -165,7 +235,7 @@ html, body {
   content: '';
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.5) 100%);
   pointer-events: none;
   z-index: 999;
 }
@@ -186,4 +256,21 @@ html, body {
   height: 100%;
   border-radius: 1px;
   transition: width 1s ease;
+}
+
+/* ── Close button ──────────────── */
+.close-btn {
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--dim);
+  font-size: 10px;
+  transition: all 0.15s;
+}
+.close-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: rgba(0, 212, 255, 0.08);
 }

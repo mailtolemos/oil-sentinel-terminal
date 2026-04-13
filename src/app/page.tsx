@@ -20,7 +20,6 @@ async function getInitialPrices(): Promise<CommodityPrice[]> {
   }
 }
 
-// Breaking news ticker items (static baseline, updated by NewsFeed live data)
 const TICKER_ITEMS = [
   '🔴 BRENT CRUDE LIVE — Real-time price intelligence',
   '⚡ STRAIT OF HORMUZ: Elevated tension — 20 Mb/d at risk',
@@ -40,12 +39,12 @@ export default async function TerminalPage() {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#030810]">
       {/* ── Top bar: Price strip ───────────────────── */}
-      <div className="shrink-0 h-[52px]">
+      <div className="shrink-0 h-[58px]">
         <PriceStrip initialPrices={initialPrices} />
       </div>
 
       {/* ── Main body: 3-column grid ───────────────── */}
-      <div className="flex-1 min-h-0 grid grid-cols-[280px_1fr_280px] gap-0 overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-cols-[300px_1fr_300px] gap-0 overflow-hidden">
         {/* Left: News feed */}
         <div className="panel border-r border-terminal-border overflow-hidden">
           <NewsFeed />
@@ -53,12 +52,12 @@ export default async function TerminalPage() {
 
         {/* Center: World map + chart stacked */}
         <div className="flex flex-col overflow-hidden border-r border-terminal-border">
-          {/* World map takes ~60% of center height */}
-          <div className="flex-[6] min-h-0 panel border-b border-terminal-border">
+          {/* World map takes ~62% of center height */}
+          <div className="flex-[62] min-h-0 panel border-b border-terminal-border">
             <WorldMap />
           </div>
-          {/* Price chart takes ~40% */}
-          <div className="flex-[4] min-h-0 panel">
+          {/* Price chart takes ~38% */}
+          <div className="flex-[38] min-h-0 panel">
             <PriceChart />
           </div>
         </div>
@@ -72,19 +71,19 @@ export default async function TerminalPage() {
       {/* ── Bottom: Alert ticker ───────────────────── */}
       <div className="shrink-0 h-6 border-t border-terminal-border bg-terminal-panel flex items-center overflow-hidden">
         <div className="shrink-0 px-2 border-r border-terminal-border h-full flex items-center">
-          <span className="text-[7px] font-['Orbitron'] text-terminal-red font-bold tracking-wider animate-pulse">
+          <span className="text-[8px] font-['Orbitron'] text-terminal-red font-bold tracking-wider animate-pulse">
             ● LIVE
           </span>
         </div>
         <div className="flex-1 overflow-hidden relative">
-          <div className="ticker-text text-[8px] text-terminal-dim">
+          <div className="ticker-text text-[9px] text-terminal-dim">
             {TICKER_ITEMS.join('   ·   ')}
             &nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;
             {TICKER_ITEMS.join('   ·   ')}
           </div>
         </div>
         <div className="shrink-0 px-2 border-l border-terminal-border h-full flex items-center">
-          <span className="text-[7px] text-terminal-dim tabular-nums" suppressHydrationWarning>
+          <span className="text-[8px] text-terminal-dim tabular-nums" suppressHydrationWarning>
             OIL SENTINEL v2.0
           </span>
         </div>
