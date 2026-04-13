@@ -85,10 +85,21 @@ html, body {
   font-size: 13px;
   line-height: 1.5;
   overflow: hidden;
-  height: 100vh;
+  height: 100%;
+  height: 100dvh;
   width: 100vw;
   transition: var(--theme-transition);
   -webkit-font-smoothing: antialiased;
+  /* Prevent double-tap zoom on mobile */
+  touch-action: manipulation;
+}
+
+/* Full-height flex wrapper for both layouts */
+#__next, main { height: 100%; height: 100dvh; }
+
+/* Mobile: prevent iOS rubber-band on body */
+@supports (-webkit-touch-callout: none) {
+  html, body { height: -webkit-fill-available; }
 }
 
 /* ── Scrollbar ─────────────────── */
@@ -391,4 +402,36 @@ html, body {
   background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.45) 100%);
   pointer-events: none;
   z-index: 999;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hide horizontal scrollbar on price strip */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Mobile: full-height panels */
+@media (max-width: 767px) {
+  html, body { overflow: hidden; position: fixed; width: 100%; }
+
+  /* Make map fill available height properly */
+  .rsm-svg { width: 100% !important; height: 100% !important; }
+
+  /* Tab bar safe area support */
+  .tab-bar-safe { padding-bottom: env(safe-area-inset-bottom, 8px); }
+
+  /* Larger touch targets */
+  button { min-height: 36px; }
+
+  /* Map tooltips: constrain on mobile */
+  .terminal-tooltip { max-width: 240px; }
+
+  /* Freshness badge pulse more visible on mobile */
+  @keyframes mobile-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(1.3); }
+  }
+  .mobile-pulse { animation: mobile-pulse 1.5s ease-in-out infinite; }
 }
