@@ -31,6 +31,99 @@ const COUNTRY_DATA: Record<string, {
   '288': { production: '0.17 Mb/d', reserves: '0.66 Gb', grade: 'Jubilee / TEN offshore', note: 'Offshore Jubilee (105 kb/d) and TEN (50 kb/d). Small but growing sub-Saharan producer.', priceImpact: 'Minor supply contributor' },
 };
 
+// ── Oil shortage / disruption overlay ────────────────────────────────────────
+// severity: 'critical' = deep red, 'high' = orange-red, 'moderate' = amber
+type ShortageSeverity = 'critical' | 'high' | 'moderate';
+interface ShortageData {
+  severity:     ShortageSeverity;
+  affectedMbpd: string;
+  issue:        string;
+  detail:       string;
+  source:       string;
+}
+
+const SHORTAGE_COUNTRIES: Record<string, ShortageData> = {
+  '364': { // Iran
+    severity:     'critical',
+    affectedMbpd: '~2.0 Mb/d sanctioned',
+    issue:        'US-OFAC Sanctions + Nuclear Standoff',
+    detail:       'Under maximum-pressure OFAC sanctions since 2018. Grey-market exports to China via Malaysia at ~60% discount to Brent. Nuclear deal collapse risk could cut remaining 1.8 Mb/d exports.',
+    source:       'US Treasury OFAC, Reuters, IAEA',
+  },
+  '862': { // Venezuela
+    severity:     'critical',
+    affectedMbpd: '~2.5 Mb/d lost since 2016',
+    issue:        'PDVSA Collapse + US Sanctions',
+    detail:       "Production collapsed from 3.2 Mb/d (2016) to ~0.7 Mb/d. PDVSA infrastructure in severe disrepair. US Chevron waiver allows limited output but structural underinvestment limits recovery.",
+    source:       'OPEC, EIA, Bloomberg',
+  },
+  '729': { // Sudan
+    severity:     'high',
+    affectedMbpd: '~0.06 Mb/d disrupted',
+    issue:        'Civil War — SAF vs RSF',
+    detail:       'Civil war since April 2023 between Sudanese Armed Forces and Rapid Support Forces. Oil infrastructure in conflict zones. Small but strategically significant for East African supply.',
+    source:       'UN OCHA, Reuters',
+  },
+  '434': { // Libya
+    severity:     'high',
+    affectedMbpd: '~0.3–0.6 Mb/d at risk',
+    issue:        'Ongoing Field Blockades + Civil Unrest',
+    detail:       'Sharara field (300 kb/d) subject to recurring tribal blockades. El Feel field disrupted. UN-backed GNU and eastern rival factions contest revenue control. Output highly volatile.',
+    source:       'NOC Libya, Reuters, S&P Platts',
+  },
+  '566': { // Nigeria
+    severity:     'high',
+    affectedMbpd: '~0.4 Mb/d theft + vandalism',
+    issue:        'Niger Delta Pipeline Vandalism',
+    detail:       'NNPC estimates ~400 kb/d losses from crude theft and pipeline sabotage in the Delta. Trans Niger Pipeline and Nembe Creek Trunkline chronically disrupted. OPEC quota compliance difficult.',
+    source:       'NNPC, World Bank, Reuters',
+  },
+  '643': { // Russia
+    severity:     'high',
+    affectedMbpd: '~0.5 Mb/d under cap pressure',
+    issue:        'G7 $60/bbl Price Cap + Ukraine War',
+    detail:       'G7 price cap restricts Western shipping/insurance for Russian oil above $60/bbl. Shadow fleet of 400+ vessels routes Urals to India & China. Dresdner / Novatek output under secondary sanction threat.',
+    source:       'IEA, US Treasury, Reuters',
+  },
+  '484': { // Mexico
+    severity:     'moderate',
+    affectedMbpd: '~0.5 Mb/d lost since 2004 peak',
+    issue:        'PEMEX Structural Decline',
+    detail:       "Pemex production fell from 3.4 Mb/d (2004) to ~1.7 Mb/d. Chronic underinvestment, high taxes siphoned to government budget, and Cantarell field natural decline. Imports rising; exports falling.",
+    source:       'PEMEX, EIA, IEA',
+  },
+  '398': { // Kazakhstan
+    severity:     'moderate',
+    affectedMbpd: '~0.2 Mb/d intermittent',
+    issue:        'CPC Pipeline Disruptions',
+    detail:       'Caspian Pipeline Consortium (CPC) — the main export route — has suffered storm damage and Russian-imposed "inspection" closures. 1.4 Mb/d capacity; outages create near-term Brent spikes.',
+    source:       'CPC Consortium, Reuters, IEA',
+  },
+  '218': { // Ecuador
+    severity:     'moderate',
+    affectedMbpd: '~0.1 Mb/d lost',
+    issue:        'Indigenous Protests + Political Instability',
+    detail:       'Recurring indigenous community blockades of Amazonian oil installations. Amazon crude production (Oriente blend) affected. Government has declared states of emergency multiple times.',
+    source:       'Petroecuador, Reuters',
+  },
+};
+
+const SHORTAGE_FILL: Record<ShortageSeverity, string> = {
+  critical: '#3d0c12',
+  high:     '#2e1404',
+  moderate: '#2a1d00',
+};
+const SHORTAGE_STROKE: Record<ShortageSeverity, string> = {
+  critical: '#cc1a2e',
+  high:     '#c85010',
+  moderate: '#b08000',
+};
+const SHORTAGE_HOVER: Record<ShortageSeverity, string> = {
+  critical: '#5a0f1a',
+  high:     '#4a1e08',
+  moderate: '#3d2c00',
+};
+
 const CP_COLORS: Record<string, string> = {
   open: '#00e87a', disrupted: '#ffb300', critical: '#ff5522', closed: '#ff0000',
 };
@@ -144,7 +237,7 @@ export default function WorldMap() {
     setDetail(detail?.type === 'chokepoint' && (detail.data as Chokepoint).id === cp.id ? null : { type: 'chokepoint', data: cp });
   }
   function handleCountryClick(id: string, name: string) {
-    if (!COUNTRY_DATA[id]) return;
+    if (!COUNTRY_DATA[id] && !SHORTAGE_COUNTRIES[id]) return;
     setDetail(detail?.type === 'country' && (detail.data as { id: string }).id === id ? null : { type: 'country', data: { name, id } });
   }
 
@@ -197,21 +290,46 @@ export default function WorldMap() {
             {({ geographies }) =>
               geographies.map(geo => {
                 const isOpec     = OPEC_COUNTRIES.has(geo.id);
-                const hasData    = !!COUNTRY_DATA[geo.id];
+                const shortage   = SHORTAGE_COUNTRIES[geo.id];
+                const hasData    = !!COUNTRY_DATA[geo.id] || !!shortage;
                 const isSelected = detail?.type === 'country' && (detail.data as { id: string }).id === geo.id;
                 const isHovered  = hoverCountry?.id === geo.id;
+
+                let fill, stroke, strokeWidth, hoverFill;
+                if (isSelected) {
+                  fill = shortage ? SHORTAGE_HOVER[shortage.severity] : '#1d4a6e';
+                  stroke = shortage ? SHORTAGE_STROKE[shortage.severity] : '#00c8f0';
+                  strokeWidth = 1.1;
+                  hoverFill = fill;
+                } else if (shortage) {
+                  fill = isHovered ? SHORTAGE_HOVER[shortage.severity] : SHORTAGE_FILL[shortage.severity];
+                  stroke = SHORTAGE_STROKE[shortage.severity];
+                  strokeWidth = isHovered ? 0.8 : 0.5;
+                  hoverFill = SHORTAGE_HOVER[shortage.severity];
+                } else if (isOpec) {
+                  fill = isHovered && hasData ? '#16384e' : '#0d2a14';
+                  stroke = '#1a4020';
+                  strokeWidth = 0.4;
+                  hoverFill = '#112518';
+                } else {
+                  fill = '#091520';
+                  stroke = '#0d2035';
+                  strokeWidth = 0.4;
+                  hoverFill = '#0d2030';
+                }
+
                 return (
                   <Geography key={geo.rsmKey} geography={geo}
-                    fill={isSelected ? '#1d4a6e' : isHovered && hasData ? '#16384e' : isOpec ? '#0d2a14' : '#091520'}
-                    stroke={isSelected ? '#00c8f0' : isOpec ? '#1a4020' : '#0d2035'}
-                    strokeWidth={isSelected ? 0.9 : 0.4}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
                     onMouseEnter={(e) => { if (geo.properties.name) setHoverCountry({ id: geo.id, name: geo.properties.name, pos: gmp(e) }); }}
                     onMouseMove={(e)  => setHoverCountry(prev => prev ? { ...prev, pos: gmp(e) } : null)}
                     onMouseLeave={() => setHoverCountry(null)}
                     onClick={(e) => { e.stopPropagation(); handleCountryClick(geo.id, geo.properties.name); }}
                     style={{
                       default: { outline: 'none', cursor: hasData ? 'pointer' : 'default' },
-                      hover:   { fill: hasData ? '#1a3d5c' : (isOpec ? '#112518' : '#0d2030'), outline: 'none' },
+                      hover:   { fill: hoverFill, outline: 'none' },
                       pressed: { outline: 'none' },
                     }}
                   />
@@ -402,14 +520,27 @@ export default function WorldMap() {
         ))}
         <div className="pt-1 mt-1 space-y-0.5" style={{ borderTop: '1px solid #0f2a42' }}>
           {[
-            { color: '#00e87a', label: 'Chokepoint — Open'    },
-            { color: '#ffb300', label: 'Chokepoint — Disrupted'},
-            { color: '#ff3355', label: 'Threat Zone — Active'  },
-            { color: '#1a4020', label: 'OPEC+ Country'         },
+            { color: '#00e87a', label: 'Chokepoint — Open'     },
+            { color: '#ffb300', label: 'Chokepoint — Disrupted' },
+            { color: '#ff3355', label: 'Threat Zone — Active'   },
+            { color: '#1a4020', label: 'OPEC+ Country'          },
           ].map(l => (
             <div key={l.label} className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full border shrink-0"
                    style={{ borderColor: l.color, background: l.color + '22' }} />
+              <span style={{ color: '#c0d8ec' }}>{l.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="pt-1 mt-1 space-y-0.5" style={{ borderTop: '1px solid #0f2a42' }}>
+          {[
+            { color: '#cc1a2e', bg: '#3d0c12', label: 'Critical Disruption' },
+            { color: '#c85010', bg: '#2e1404', label: 'High Risk Supply'     },
+            { color: '#b08000', bg: '#2a1d00', label: 'Moderate Disruption'  },
+          ].map(l => (
+            <div key={l.label} className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-sm border shrink-0"
+                   style={{ borderColor: l.color, background: l.bg }} />
               <span style={{ color: '#c0d8ec' }}>{l.label}</span>
             </div>
           ))}
@@ -523,31 +654,89 @@ export default function WorldMap() {
       {hoverCountry && (
         <div className="fixed z-50 pointer-events-none"
              style={{ left: hoverCountry.pos.x + 16, top: hoverCountry.pos.y - 8 }}>
-          {COUNTRY_DATA[hoverCountry.id] ? (
-            <div className="min-w-[220px] text-[9px]"
-                 style={{ background: 'rgba(3,13,28,0.98)', border: '1px solid rgba(0,232,122,0.25)',
-                          boxShadow: '0 4px 24px rgba(0,0,0,0.8)' }}>
+          {(COUNTRY_DATA[hoverCountry.id] || SHORTAGE_COUNTRIES[hoverCountry.id]) ? (
+            <div className="min-w-[240px] text-[9px]"
+                 style={{
+                   background: 'rgba(3,13,28,0.98)',
+                   border: SHORTAGE_COUNTRIES[hoverCountry.id]
+                     ? `1px solid ${SHORTAGE_STROKE[SHORTAGE_COUNTRIES[hoverCountry.id].severity]}55`
+                     : '1px solid rgba(0,232,122,0.25)',
+                   boxShadow: '0 4px 24px rgba(0,0,0,0.8)',
+                 }}>
+              {/* Header */}
               <div className="flex items-center gap-2 px-2.5 py-2 border-b"
-                   style={{ borderColor: '#0f2a42', background: 'rgba(0,232,122,0.05)' }}>
+                   style={{
+                     borderColor: '#0f2a42',
+                     background: SHORTAGE_COUNTRIES[hoverCountry.id]
+                       ? SHORTAGE_STROKE[SHORTAGE_COUNTRIES[hoverCountry.id].severity] + '0a'
+                       : 'rgba(0,232,122,0.05)',
+                   }}>
                 <span className="font-bold text-[11px]" style={{ color: '#eaf6ff' }}>{hoverCountry.name}</span>
-                {OPEC_COUNTRIES.has(hoverCountry.id) && (
-                  <span className="text-[7px] px-1.5 py-0.5 rounded font-bold ml-auto"
-                        style={{ color: '#00e87a', background: 'rgba(0,232,122,0.10)', border: '1px solid rgba(0,232,122,0.3)' }}>
-                    OPEC+
-                  </span>
-                )}
+                <div className="ml-auto flex items-center gap-1">
+                  {OPEC_COUNTRIES.has(hoverCountry.id) && (
+                    <span className="text-[7px] px-1.5 py-0.5 rounded font-bold"
+                          style={{ color: '#00e87a', background: 'rgba(0,232,122,0.10)', border: '1px solid rgba(0,232,122,0.3)' }}>
+                      OPEC+
+                    </span>
+                  )}
+                  {SHORTAGE_COUNTRIES[hoverCountry.id] && (
+                    <span className="text-[7px] px-1.5 py-0.5 rounded font-bold uppercase"
+                          style={{
+                            color: SHORTAGE_STROKE[SHORTAGE_COUNTRIES[hoverCountry.id].severity],
+                            background: SHORTAGE_FILL[SHORTAGE_COUNTRIES[hoverCountry.id].severity],
+                            border: `1px solid ${SHORTAGE_STROKE[SHORTAGE_COUNTRIES[hoverCountry.id].severity]}55`,
+                          }}>
+                      ⚠ {SHORTAGE_COUNTRIES[hoverCountry.id].severity}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="px-2.5 py-2 space-y-1">
-                <MapRow label="Production" value={COUNTRY_DATA[hoverCountry.id].production} col="#00c8f0" bold />
-                <MapRow label="Reserves"   value={COUNTRY_DATA[hoverCountry.id].reserves}   col="#00e87a" bold />
-                <MapRow label="Grade"      value={COUNTRY_DATA[hoverCountry.id].grade}       col="#ffb300" />
-                <MapRow label="Price Δ"    value={COUNTRY_DATA[hoverCountry.id].priceImpact} col="#ff9944" />
-                {COUNTRY_DATA[hoverCountry.id].opecQuota && (
-                  <MapRow label="OPEC Quota" value={COUNTRY_DATA[hoverCountry.id].opecQuota!} col="#c0d8ec" />
+                {/* Shortage info (prominent) */}
+                {SHORTAGE_COUNTRIES[hoverCountry.id] && (() => {
+                  const s   = SHORTAGE_COUNTRIES[hoverCountry.id];
+                  const col = SHORTAGE_STROKE[s.severity];
+                  return (
+                    <>
+                      <div className="px-2 py-1.5 rounded mb-1.5"
+                           style={{ background: SHORTAGE_FILL[s.severity], border: `1px solid ${col}33` }}>
+                        <div className="text-[8px] font-bold uppercase tracking-wide mb-0.5" style={{ color: col }}>
+                          {s.issue}
+                        </div>
+                        <div className="text-[8px]" style={{ color: '#e0e8f0' }}>
+                          {s.affectedMbpd} at risk
+                        </div>
+                      </div>
+                      <div className="text-[8px] leading-snug" style={{ color: '#c0d8ec' }}>{s.detail}</div>
+                      <div className="text-[7px] mt-1 pt-1" style={{ borderTop: '1px solid #0f2a42', color: '#6b9db8' }}>
+                        Source: {s.source}
+                      </div>
+                    </>
+                  );
+                })()}
+                {/* Production data (if available) */}
+                {COUNTRY_DATA[hoverCountry.id] && !SHORTAGE_COUNTRIES[hoverCountry.id] && (
+                  <>
+                    <MapRow label="Production" value={COUNTRY_DATA[hoverCountry.id].production} col="#00c8f0" bold />
+                    <MapRow label="Reserves"   value={COUNTRY_DATA[hoverCountry.id].reserves}   col="#00e87a" bold />
+                    <MapRow label="Grade"      value={COUNTRY_DATA[hoverCountry.id].grade}       col="#ffb300" />
+                    <MapRow label="Price Δ"    value={COUNTRY_DATA[hoverCountry.id].priceImpact} col="#ff9944" />
+                    {COUNTRY_DATA[hoverCountry.id].opecQuota && (
+                      <MapRow label="OPEC Quota" value={COUNTRY_DATA[hoverCountry.id].opecQuota!} col="#c0d8ec" />
+                    )}
+                    <div className="text-[8px] leading-snug pt-0.5 border-t mt-1" style={{ borderColor: '#0f2a42', color: '#8ab8cc' }}>
+                      {COUNTRY_DATA[hoverCountry.id].note}
+                    </div>
+                  </>
                 )}
-                <div className="text-[8px] leading-snug pt-0.5 border-t mt-1" style={{ borderColor: '#0f2a42', color: '#8ab8cc' }}>
-                  {COUNTRY_DATA[hoverCountry.id].note}
-                </div>
+                {/* Show production data alongside shortage if available */}
+                {COUNTRY_DATA[hoverCountry.id] && SHORTAGE_COUNTRIES[hoverCountry.id] && (
+                  <div className="pt-1 mt-1 border-t space-y-1" style={{ borderColor: '#0f2a42' }}>
+                    <MapRow label="Current Output" value={COUNTRY_DATA[hoverCountry.id].production} col="#00c8f0" bold />
+                    <MapRow label="Grade"          value={COUNTRY_DATA[hoverCountry.id].grade}       col="#ffb300" />
+                    <MapRow label="Price Δ"        value={COUNTRY_DATA[hoverCountry.id].priceImpact} col="#ff9944" />
+                  </div>
+                )}
               </div>
               <div className="px-2.5 pb-1.5 text-[8px] italic" style={{ color: '#3a5a72' }}>Click to expand details</div>
             </div>
@@ -633,10 +822,12 @@ export default function WorldMap() {
 
           {/* COUNTRY */}
           {detail.type === 'country' && (() => {
-            const c    = detail.data as { name: string; id: string };
-            const info = COUNTRY_DATA[c.id];
-            if (!info) return null;
+            const c        = detail.data as { name: string; id: string };
+            const info     = COUNTRY_DATA[c.id];
+            const shortage = SHORTAGE_COUNTRIES[c.id];
+            if (!info && !shortage) return null;
             const isOpec = OPEC_COUNTRIES.has(c.id);
+            const shortageCol = shortage ? SHORTAGE_STROKE[shortage.severity] : null;
             return (
               <div className="p-3.5">
                 <div className="flex items-start justify-between mb-2.5">
@@ -648,17 +839,41 @@ export default function WorldMap() {
                         OPEC+
                       </span>
                     )}
-                    {info.opecQuota && <span className="text-[9px]" style={{ color: '#6b9db8' }}>Quota: {info.opecQuota}</span>}
+                    {shortage && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase"
+                            style={{ color: shortageCol!, background: SHORTAGE_FILL[shortage.severity], border: `1px solid ${shortageCol}44` }}>
+                        ⚠ DISRUPTED — {shortage.severity}
+                      </span>
+                    )}
+                    {info?.opecQuota && <span className="text-[9px]" style={{ color: '#6b9db8' }}>Quota: {info.opecQuota}</span>}
                   </div>
                   <button onClick={() => setDetail(null)} className="close-btn">✕</button>
                 </div>
-                <div className="data-grid mb-2.5">
-                  <MapDataCell label="Production"    value={info.production}   blue />
-                  <MapDataCell label="Reserves"      value={info.reserves}     green />
-                  <MapDataCell label="Crude Grade(s)"value={info.grade}        amber span2 />
-                  <MapDataCell label="Price Impact"  value={info.priceImpact}  span2 />
-                </div>
-                <div className="text-[10px] leading-snug" style={{ color: '#c0d8ec' }}>{info.note}</div>
+
+                {/* Shortage banner */}
+                {shortage && (
+                  <div className="mb-2.5 px-3 py-2 rounded border"
+                       style={{ background: SHORTAGE_FILL[shortage.severity], borderColor: shortageCol + '44' }}>
+                    <div className="text-[10px] font-bold mb-1" style={{ color: shortageCol! }}>{shortage.issue}</div>
+                    <div className="text-[9px] leading-snug" style={{ color: '#e0e8f0' }}>{shortage.detail}</div>
+                    <div className="text-[8px] mt-1.5 font-semibold" style={{ color: shortageCol! }}>
+                      Volume at risk: {shortage.affectedMbpd}
+                    </div>
+                    <div className="text-[7px] mt-0.5" style={{ color: '#8ab8cc' }}>Source: {shortage.source}</div>
+                  </div>
+                )}
+
+                {info && (
+                  <>
+                    <div className="data-grid mb-2.5">
+                      <MapDataCell label="Production"    value={info.production}   blue />
+                      <MapDataCell label="Reserves"      value={info.reserves}     green />
+                      <MapDataCell label="Crude Grade(s)"value={info.grade}        amber span2 />
+                      <MapDataCell label="Price Impact"  value={info.priceImpact}  span2 />
+                    </div>
+                    <div className="text-[10px] leading-snug" style={{ color: '#c0d8ec' }}>{info.note}</div>
+                  </>
+                )}
               </div>
             );
           })()}

@@ -5,14 +5,16 @@ import WorldMap from '@/components/WorldMap';
 import NewsFeed from '@/components/NewsFeed';
 import PriceChart from '@/components/PriceChart';
 import ThreatMatrix from '@/components/ThreatMatrix';
+import RecapPanel from '@/components/RecapPanel';
 
-type Tab = 'map' | 'news' | 'threats' | 'chart';
+type Tab = 'map' | 'news' | 'threats' | 'chart' | 'recap';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'map',     label: 'MAP',     icon: '🌍' },
   { id: 'news',    label: 'NEWS',    icon: '📰' },
   { id: 'threats', label: 'THREATS', icon: '⚠️' },
   { id: 'chart',   label: 'CHART',   icon: '📈' },
+  { id: 'recap',   label: 'BRIEF',   icon: '🤖' },
 ];
 
 const TICKER_ITEMS = [
@@ -89,6 +91,7 @@ export default function MobileTerminal({ initialPrices }: Props) {
         <div className={`h-full ${tab === 'news'    ? 'block' : 'hidden'}`}><NewsFeed /></div>
         <div className={`h-full ${tab === 'threats' ? 'block' : 'hidden'}`}><ThreatMatrix /></div>
         <div className={`h-full ${tab === 'chart'   ? 'block' : 'hidden'}`}><PriceChart /></div>
+        <div className={`h-full ${tab === 'recap'   ? 'block' : 'hidden'}`}><RecapPanel /></div>
       </div>
 
       {/* ── Bottom ticker ────────────────────────────────────── */}
@@ -101,7 +104,7 @@ export default function MobileTerminal({ initialPrices }: Props) {
       </div>
 
       {/* ── Tab bar ──────────────────────────────────────────── */}
-      <div className="shrink-0 grid grid-cols-4 border-t border-terminal-border bg-terminal-panel"
+      <div className="shrink-0 grid grid-cols-5 border-t border-terminal-border bg-terminal-panel"
            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {TABS.map(t => (
           <button

@@ -88,6 +88,18 @@ const RSS_FEEDS = [
     source: 'Macro Risk', tier: 2, topic: 'macro' },
   { url: 'https://news.google.com/rss/search?q=global+conflict+war+oil+supply+disruption+geopolitical+risk&hl=en-US&gl=US&ceid=US:en',
     source: 'Geopolitical Risk', tier: 1, topic: 'geopolitical' },
+
+  // ── Google News: Supply shortage countries ─────────────────────────────────
+  { url: 'https://news.google.com/rss/search?q=Venezuela+PDVSA+oil+production+shortage+sanctions+Maduro&hl=en-US&gl=US&ceid=US:en',
+    source: 'Venezuela Oil', tier: 2, topic: 'shortage' },
+  { url: 'https://news.google.com/rss/search?q=Sudan+civil+war+oil+pipeline+disruption+conflict&hl=en-US&gl=US&ceid=US:en',
+    source: 'Sudan Crisis', tier: 2, topic: 'shortage' },
+  { url: 'https://news.google.com/rss/search?q=Kazakhstan+CPC+pipeline+oil+export+disruption+Caspian&hl=en-US&gl=US&ceid=US:en',
+    source: 'CPC Pipeline', tier: 2, topic: 'shortage' },
+  { url: 'https://news.google.com/rss/search?q=Mexico+Pemex+oil+production+decline+output+shortage&hl=en-US&gl=US&ceid=US:en',
+    source: 'Mexico Pemex', tier: 2, topic: 'shortage' },
+  { url: 'https://news.google.com/rss/search?q=Ecuador+oil+indigenous+protest+Amazon+production+block&hl=en-US&gl=US&ceid=US:en',
+    source: 'Ecuador Oil', tier: 2, topic: 'shortage' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,6 +139,11 @@ const DRIVER_MAP: Record<string, string> = {
   'federal reserve|fed rate|interest rate|fomc|dollar|dxy': 'macro',
   'russia|urals|espo|moscow|novatek|lukoil|rosneft': 'russia',
   'libya|nigeria|iraq|venezuela|angola|kazakh|azerbaij': 'supply_disruption',
+  'pdvsa|maracaibo|orinoco|chevron venezuela': 'supply_disruption',
+  'cpc pipeline|tengiz|kashagan|aktau|caspian': 'supply_disruption',
+  'pemex|cantarell|chicontepec|campeche': 'supply_disruption',
+  'sudan|south sudan|nile|khartoum|rsf|saf conflict': 'supply_disruption',
+  'shortage|deficit|supply gap|output curtail|force majeure|outage': 'supply_disruption',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -179,6 +196,7 @@ function scoreArticle(
     : topic === 'opec' ? 12
     : topic === 'inventory' ? 10
     : topic === 'geopolitical' ? 12
+    : topic === 'shortage' ? 14
     : 0;
 
   const driverWeight = drivers.length;

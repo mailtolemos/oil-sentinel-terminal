@@ -4,6 +4,7 @@ import NewsFeed from '@/components/NewsFeed';
 import WorldMap from '@/components/WorldMap';
 import PriceChart from '@/components/PriceChart';
 import ThreatMatrix from '@/components/ThreatMatrix';
+import RecapPanel from '@/components/RecapPanel';
 import MobileTerminal from '@/components/MobileTerminal';
 
 export const revalidate = 30;
@@ -74,9 +75,14 @@ export default async function TerminalPage() {
             </div>
           </div>
 
-          {/* Right: Threat matrix */}
-          <div className="panel overflow-hidden flex flex-col">
-            <ThreatMatrix />
+          {/* Right: Threat matrix + AI Recap stacked */}
+          <div className="flex flex-col overflow-hidden">
+            <div className="flex-[58] min-h-0 panel border-b border-terminal-border">
+              <ThreatMatrix />
+            </div>
+            <div className="flex-[42] min-h-0 panel">
+              <RecapPanel />
+            </div>
           </div>
         </div>
 
