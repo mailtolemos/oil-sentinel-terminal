@@ -344,46 +344,46 @@ export default function WorldMap() {
              style={{ borderTopColor: biasColor(tradeSignal.bias) + '80' }}>
           <div className="px-2.5 pt-2 pb-1 border-b border-[#112840]">
             <div className="flex items-center justify-between mb-0.5">
-              <span className="font-['Orbitron'] text-[7px] tracking-widest text-[#5a8aaa]">BRENT SIGNAL</span>
-              <span className="text-[8px] font-bold" style={{ color: biasColor(tradeSignal.bias) }}>
+              <span className="font-['Orbitron'] text-[8px] tracking-widest text-[#5a8aaa]">BRENT SIGNAL</span>
+              <span className="text-[9px] font-bold" style={{ color: biasColor(tradeSignal.bias) }}>
                 {biasLabel(tradeSignal.bias)}
               </span>
             </div>
             {/* Big price */}
             <div className="flex items-end gap-1.5">
-              <span className="text-[22px] font-bold tabular-nums leading-none"
+              <span className="text-[24px] font-bold tabular-nums leading-none"
                     style={{ color: biasColor(tradeSignal.bias) }}>
                 ${tradeSignal.price.toFixed(2)}
               </span>
-              <span className="text-[9px] text-[#5a8aaa] mb-0.5">/bbl</span>
+              <span className="text-[10px] text-[#5a8aaa] mb-0.5">/bbl</span>
             </div>
           </div>
 
           {/* 7-day target */}
-          <div className="px-2.5 py-1.5 border-b border-[#112840] bg-[#060e1c]/60">
-            <div className="text-[7px] text-[#5a8aaa] uppercase tracking-wider mb-1">7-Day Target</div>
+          <div className="px-2.5 py-2 border-b border-[#112840] bg-[#060e1c]/60">
+            <div className="text-[8px] text-[#5a8aaa] uppercase tracking-wider font-bold mb-1">7-Day Target</div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[14px] font-bold tabular-nums"
+              <span className="text-[15px] font-bold tabular-nums"
                     style={{ color: tradeSignal.target7d > tradeSignal.price ? '#00ff88' : '#ff3344' }}>
                 ${tradeSignal.target7d.toFixed(2)}
               </span>
-              <span className="text-[9px]"
+              <span className="text-[10px] font-semibold"
                     style={{ color: tradeSignal.target7d > tradeSignal.price ? '#00ff88' : '#ff3344' }}>
                 {tradeSignal.target7d > tradeSignal.price ? '▲' : '▼'}
                 {' '}{Math.abs(tradeSignal.target7d - tradeSignal.price).toFixed(2)}
               </span>
             </div>
-            <div className="text-[8px] text-[#5a8aaa] mt-0.5">
+            <div className="text-[8px] text-[#7aaccc] mt-0.5">
               Range ${tradeSignal.target7dLow.toFixed(1)} – ${tradeSignal.target7dHigh.toFixed(1)}
             </div>
           </div>
 
           {/* Signals */}
-          <div className="px-2.5 py-1.5">
+          <div className="px-2.5 py-2">
             {tradeSignal.signals.slice(0, 4).map((sig, i) => (
-              <div key={i} className="flex items-center justify-between gap-1 mb-1 last:mb-0">
-                <span className="text-[8px] text-[#5a8aaa] truncate">{sig.name}</span>
-                <span className="text-[8px] font-semibold shrink-0"
+              <div key={i} className="flex items-center justify-between gap-1 mb-1.5 last:mb-0">
+                <span className="text-[8px] text-[#7aaccc] truncate">{sig.name}</span>
+                <span className="text-[9px] font-bold shrink-0"
                       style={{ color: sig.direction === 'bullish' ? '#00ff88' : sig.direction === 'bearish' ? '#ff3344' : '#ffaa00' }}>
                   {sig.value}
                 </span>
@@ -392,8 +392,8 @@ export default function WorldMap() {
           </div>
 
           {/* Bias bar */}
-          <div className="px-2.5 pb-2">
-            <div className="h-1 bg-[#112840] rounded-full overflow-hidden">
+          <div className="px-2.5 pb-2.5">
+            <div className="h-1.5 bg-[#112840] rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-all duration-1000"
                    style={{
                      width: tradeSignal.bias === 'strongly_bullish' ? '95%'
@@ -404,7 +404,7 @@ export default function WorldMap() {
                      background: `linear-gradient(90deg, #ff3344, #ffaa00, #00ff88)`,
                    }} />
             </div>
-            <div className="flex justify-between text-[7px] text-[#3a5a72] mt-0.5">
+            <div className="flex justify-between text-[8px] text-[#5a8aaa] mt-1 font-bold">
               <span>BEAR</span><span>BULL</span>
             </div>
           </div>
@@ -431,7 +431,7 @@ export default function WorldMap() {
       {/* ── Legend ────────────────────────────────── */}
       <div className="absolute left-2 z-20 bg-[#040d1a]/95 border border-[#112840] px-2.5 py-2 text-[8px] backdrop-blur-sm"
            style={{ bottom: panelOpen ? '220px' : '8px', transition: 'bottom 0.25s ease' }}>
-        <div className="text-[#5a8aaa] font-['Orbitron'] text-[7px] tracking-wider mb-1.5">LEGEND</div>
+        <div className="text-[#a8cce0] font-['Orbitron'] text-[8px] tracking-wider mb-1.5 font-bold">LEGEND</div>
         {[
           { color: '#00d4ff', label: 'VLCC (>200k DWT)',     dot: true },
           { color: '#22ccee', label: 'Suezmax (120–200k)',    dot: true },
@@ -460,7 +460,7 @@ export default function WorldMap() {
             </div>
           ))}
         </div>
-        <div className="text-[#3a5a72] text-[7px] mt-1.5 pt-1 border-t border-[#112840]">
+        <div className="text-[#5a8aaa] text-[8px] mt-1.5 pt-1 border-t border-[#112840]">
           Hover for info · Click to expand
         </div>
       </div>

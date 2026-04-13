@@ -159,8 +159,8 @@ export default function NewsFeed() {
                 <span className={`text-[8px] px-1 py-0.5 rounded ${TIER_BADGES[tier]}`}>
                   {tier === 'flash' ? '🚨' : tier === 'analysis' ? '📊' : '📋'} {item.impactScore}
                 </span>
-                <span className="text-terminal-dim text-[8px] ml-auto truncate max-w-[60px]">{item.source}</span>
-                <span className="text-terminal-dim text-[8px] shrink-0">{timeAgo(item.publishedAt)}</span>
+                <span className="text-terminal-text text-[8px] ml-auto truncate max-w-[70px]">{item.source}</span>
+                <span className="text-terminal-text text-[8px] shrink-0">{timeAgo(item.publishedAt)}</span>
               </div>
 
               {/* Title */}

@@ -21,23 +21,23 @@ const SIGNAL_COLORS = { bullish: 'text-terminal-green', bearish: 'text-terminal-
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="panel px-2 py-1.5 text-[8px] border border-terminal-border z-50">
-      <div className="text-terminal-dim mb-1">{label}</div>
-      {payload.map((p: any) => (
+    <div className="panel px-2.5 py-2 text-[9px] border border-terminal-border z-50">
+      <div className="text-terminal-dim mb-1 font-bold">{label}</div>
+      {payload.map((p: any) =>
         p.value != null && (
-          <div key={p.dataKey} style={{ color: p.color }} className="flex gap-3 justify-between">
+          <div key={p.dataKey} style={{ color: p.color }} className="flex gap-4 justify-between">
             <span>{p.name}:</span>
             <span className="font-bold tabular-nums">${Number(p.value).toFixed(2)}</span>
           </div>
         )
-      ))}
+      )}
     </div>
   );
 }
 
 export default function PriceChart() {
-  const [proj, setProj] = useState<PriceProjection | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [proj, setProj]               = useState<PriceProjection | null>(null);
+  const [loading, setLoading]         = useState(true);
   const [activeSymbol, setActiveSymbol] = useState<'BRT' | 'WTI'>('BRT');
 
   const fetchProjection = async () => {
@@ -46,8 +46,7 @@ export default function PriceChart() {
       const r = await fetch(`/api/projection?symbol=${ticker}`);
       const d = await r.json();
       setProj(d);
-    } catch { /* keep stale */ }
-    finally { setLoading(false); }
+    } catch { /* stale */ } finally { setLoading(false); }
   };
 
   useEffect(() => {
@@ -59,28 +58,24 @@ export default function PriceChart() {
   }, [activeSymbol]);
 
   const bias = (proj?.bias ?? 'neutral') as BiasKey;
-  const bc = BIAS_CONFIG[bias] ?? BIAS_CONFIG.neutral;
-  const chartData = proj?.chartData ?? [];
-
-  // Find split between actual and projected
-  const splitDate = chartData.find(d => d.projected != null)?.date;
+  const bc   = BIAS_CONFIG[bias] ?? BIAS_CONFIG.neutral;
+  const chartData  = proj?.chartData ?? [];
+  const splitDate  = chartData.find(d => d.projected != null)?.date;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+
       {/* Header */}
       <div className="section-header shrink-0">
         <div className="dot" />
         <span>PRICE PROJECTION</span>
         <div className="ml-auto flex gap-1">
           {(['BRT', 'WTI'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setActiveSymbol(s)}
-              className={`text-[7px] px-2 py-0.5 rounded border transition-colors font-['Orbitron'] uppercase
+            <button key={s} onClick={() => setActiveSymbol(s)}
+              className={`text-[9px] px-2 py-0.5 rounded border transition-colors font-['Orbitron'] uppercase
                 ${activeSymbol === s
                   ? 'bg-terminal-blue/20 border-terminal-blue text-terminal-blue'
-                  : 'border-terminal-border text-terminal-dim hover:border-terminal-dim'}`}
-            >
+                  : 'border-terminal-border text-terminal-dim hover:border-terminal-dim hover:text-terminal-text'}`}>
               {s}
             </button>
           ))}
@@ -90,89 +85,70 @@ export default function PriceChart() {
       {/* Bias banner */}
       {proj && (
         <div className={`shrink-0 flex items-center gap-3 px-3 py-1.5 border-b border-terminal-border ${bc.bg}`}>
-          <span className={`text-[10px] font-bold ${bc.text} ${bc.glow} font-['Orbitron'] tracking-wide`}>
+          <span className={`text-[11px] font-bold ${bc.text} ${bc.glow} font-['Orbitron'] tracking-wide`}>
             {bc.label}
           </span>
-          <span className="text-terminal-dim text-[8px]">
+          <span className="text-terminal-text text-[9px]">
             SENTIMENT {proj.sentimentScore > 0 ? '+' : ''}{proj.sentimentScore}
           </span>
-          <span className="ml-auto text-terminal-dim text-[8px] tabular-nums">
+          <span className="ml-auto text-terminal-bright text-[10px] font-bold tabular-nums">
             ${proj.currentPrice.toFixed(2)}
           </span>
         </div>
       )}
 
       {/* Chart */}
-      <div className="flex-1 min-h-0 px-1 pt-2">
+      <div className="flex-1 min-h-0 px-1 pt-1.5">
         {loading ? (
-          <div className="flex items-center justify-center h-full text-terminal-dim text-[9px]">
+          <div className="flex items-center justify-center h-full text-terminal-dim text-[10px]">
             <span className="animate-pulse">LOADING PROJECTION DATA…</span>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: -10 }}>
+            <ComposedChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: -8 }}>
               <defs>
                 <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00ff88" stopOpacity={0.15} />
+                  <stop offset="5%"  stopColor="#00ff88" stopOpacity={0.15} />
                   <stop offset="95%" stopColor="#00ff88" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="projGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.12} />
+                  <stop offset="5%"  stopColor="#00d4ff" stopOpacity={0.12} />
                   <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
                 </linearGradient>
               </defs>
-
-              <CartesianGrid strokeDasharray="2 4" stroke="rgba(13,34,56,0.8)" />
+              <CartesianGrid strokeDasharray="2 4" stroke="rgba(17,40,64,0.7)" />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 7, fill: '#3a6080' }}
+                tick={{ fontSize: 9, fill: '#5a8aaa' }}
                 interval={Math.floor(chartData.length / 6)}
                 tickLine={false}
-                axisLine={{ stroke: '#0d2238' }}
+                axisLine={{ stroke: '#112840' }}
               />
               <YAxis
-                tick={{ fontSize: 7, fill: '#3a6080' }}
+                tick={{ fontSize: 9, fill: '#5a8aaa' }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={v => `$${v}`}
-                width={38}
+                width={40}
                 domain={['auto', 'auto']}
               />
               <Tooltip content={<CustomTooltip />} />
-
-              {/* CI band (filled area between high and low) */}
               <Area dataKey="high" fill="rgba(0,212,255,0.06)" stroke="none" name="CI High" legendType="none" />
               <Area dataKey="low"  fill="rgba(3,8,16,0.99)"   stroke="none" name="CI Low"  legendType="none" />
-
-              {/* Actual price */}
               <Area
-                dataKey="actual"
-                stroke="#00ff88"
-                strokeWidth={1.5}
-                fill="url(#actualGrad)"
-                dot={false}
-                name="Actual"
-                connectNulls={false}
+                dataKey="actual" stroke="#00ff88" strokeWidth={1.8}
+                fill="url(#actualGrad)" dot={false} name="Actual" connectNulls={false}
               />
-
-              {/* Projected price */}
               <Line
-                dataKey="projected"
-                stroke="#00d4ff"
-                strokeWidth={1.5}
-                dot={false}
-                strokeDasharray="4 2"
-                name="Projected"
-                connectNulls={false}
+                dataKey="projected" stroke="#00d4ff" strokeWidth={1.8}
+                dot={false} strokeDasharray="4 2" name="Projected" connectNulls={false}
               />
-
-              {/* Split line */}
               {splitDate && (
                 <ReferenceLine
                   x={splitDate}
-                  stroke="rgba(58,96,128,0.6)"
+                  stroke="rgba(90,138,170,0.5)"
                   strokeDasharray="3 3"
-                  label={{ value: 'NOW', fill: '#3a6080', fontSize: 7, position: 'insideTopRight' }}
+                  label={{ value: 'NOW', fill: '#5a8aaa', fontSize: 9, position: 'insideTopRight' }}
                 />
               )}
             </ComposedChart>
@@ -180,23 +156,24 @@ export default function PriceChart() {
         )}
       </div>
 
-      {/* Projection cards */}
+      {/* Projection target cards */}
       {proj && (
         <div className="shrink-0 grid grid-cols-3 gap-1 px-2 pb-2 pt-1 border-t border-terminal-border">
           {proj.projections.map(p => {
             const changePct = proj.currentPrice
-              ? ((p.price - proj.currentPrice) / proj.currentPrice) * 100
-              : 0;
+              ? ((p.price - proj.currentPrice) / proj.currentPrice) * 100 : 0;
             return (
-              <div key={p.days} className="panel px-2 py-1.5 text-center">
-                <div className="text-terminal-dim text-[7px] mb-0.5">{p.label.toUpperCase()}</div>
-                <div className={`text-[12px] font-bold ${changePct >= 0 ? 'value-up' : 'value-down'} leading-none`}>
+              <div key={p.days} className="panel px-2 py-2 text-center">
+                <div className="text-[9px] text-terminal-dim font-['Orbitron'] tracking-wider mb-1">
+                  {p.label.toUpperCase()}
+                </div>
+                <div className={`text-[14px] font-bold tabular-nums leading-none ${changePct >= 0 ? 'value-up' : 'value-down'}`}>
                   ${p.price.toFixed(2)}
                 </div>
-                <div className={`text-[8px] mt-0.5 ${changePct >= 0 ? 'value-up' : 'value-down'}`}>
+                <div className={`text-[9px] mt-0.5 font-semibold ${changePct >= 0 ? 'value-up' : 'value-down'}`}>
                   {changePct >= 0 ? '+' : ''}{changePct.toFixed(1)}%
                 </div>
-                <div className="text-terminal-dim text-[6px] mt-0.5 leading-tight">
+                <div className="text-[8px] text-terminal-dim mt-0.5">
                   ${p.low.toFixed(0)}–${p.high.toFixed(0)} · {p.confidence}% CI
                 </div>
               </div>
@@ -207,16 +184,18 @@ export default function PriceChart() {
 
       {/* Technical signals */}
       {proj && proj.signals.length > 0 && (
-        <div className="shrink-0 border-t border-terminal-border px-2 py-1.5">
-          <div className="text-terminal-dim text-[7px] uppercase tracking-wider mb-1">Technical Signals</div>
+        <div className="shrink-0 border-t border-terminal-border px-2 py-2">
           <div className="flex flex-wrap gap-1">
             {proj.signals.map((sig, i) => (
-              <div key={i} className="flex items-center gap-0.5 text-[7px] px-1.5 py-0.5 border border-terminal-muted rounded">
-                <span className={SIGNAL_COLORS[sig.direction]}>{
-                  sig.direction === 'bullish' ? '▲' : sig.direction === 'bearish' ? '▼' : '◆'
-                }</span>
+              <div key={i}
+                className="flex items-center gap-1 text-[9px] px-2 py-0.5 border border-terminal-border rounded bg-terminal-panel/60">
+                <span className={SIGNAL_COLORS[sig.direction as keyof typeof SIGNAL_COLORS]}>
+                  {sig.direction === 'bullish' ? '▲' : sig.direction === 'bearish' ? '▼' : '◆'}
+                </span>
                 <span className="text-terminal-dim">{sig.name}:</span>
-                <span className={`font-bold ${SIGNAL_COLORS[sig.direction]}`}>{sig.value}</span>
+                <span className={`font-bold ${SIGNAL_COLORS[sig.direction as keyof typeof SIGNAL_COLORS]}`}>
+                  {sig.value}
+                </span>
               </div>
             ))}
           </div>
