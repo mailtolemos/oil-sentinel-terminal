@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;600;700;900&display=swap');
+
+:root {
+  --bg:        #030810;
+  --panel:     #050d1a;
+  --border:    #0d2238;
+  --blue:      #00d4ff;
+  --green:     #00ff88;
+  --amber:     #ffaa00;
+  --red:       #ff3344;
+  --dim:       #3a6080;
+  --text:      #8ab8d0;
+  --bright:    #d0eaf8;
+  --muted:     #1e3a52;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 12px;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ── Scrollbar ─────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+/* ── Panel style ───────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-top: 1px solid rgba(0, 212, 255, 0.15);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(0, 212, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.4), transparent);
+}
+
+/* ── Glow text ─────────────────── */
+.glow-blue  { text-shadow: 0 0 10px rgba(0, 212, 255, 0.8); }
+.glow-green { text-shadow: 0 0 10px rgba(0, 255, 136, 0.8); }
+.glow-red   { text-shadow: 0 0 10px rgba(255, 51,  68, 0.8); }
+.glow-amber { text-shadow: 0 0 10px rgba(255, 170,  0, 0.8); }
+
+/* ── Section header ────────────── */
+.section-header {
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--dim);
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-header .dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 6px var(--blue);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ── Pulse rings ───────────────── */
+@keyframes ring-pulse {
+  0%   { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.ring-pulse {
+  animation: ring-pulse 2s ease-out infinite;
+}
+
+.ring-pulse-delay {
+  animation: ring-pulse 2s ease-out infinite 0.7s;
+}
+
+/* ── Scrolling ticker ──────────── */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
+}
+
+.ticker-text {
+  animation: ticker-scroll 60s linear infinite;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* ── Price flash ───────────────── */
+@keyframes flash-green {
+  0%, 100% { background: transparent; }
+  50%       { background: rgba(0, 255, 136, 0.15); }
+}
+@keyframes flash-red {
+  0%, 100% { background: transparent; }
+  50%       { background: rgba(255, 51, 68, 0.15); }
+}
+
+.flash-up   { animation: flash-green 0.6s ease-in-out; }
+.flash-down { animation: flash-red 0.6s ease-in-out; }
+
+/* ── Map overlay ───────────────── */
+.rsm-geographies path {
+  outline: none;
+}
+.rsm-geography {
+  transition: fill 0.2s;
+}
+.rsm-geography:hover {
+  fill: #162d42 !important;
+  cursor: pointer;
+}
+
+/* ── Chart custom ──────────────── */
+.recharts-text { fill: var(--dim) !important; font-size: 10px !important; }
+.recharts-cartesian-axis-tick-value { fill: var(--dim) !important; }
+.recharts-legend-item-text { color: var(--text) !important; font-size: 10px !important; }
+
+/* ── Impact badge ──────────────── */
+.badge-flash    { background: rgba(255,51,68,0.15);  border: 1px solid rgba(255,51,68,0.4);  color: #ff3344; }
+.badge-analysis { background: rgba(255,170,0,0.12);  border: 1px solid rgba(255,170,0,0.3);  color: #ffaa00; }
+.badge-digest   { background: rgba(0,212,255,0.08);  border: 1px solid rgba(0,212,255,0.2);  color: #00d4ff; }
+.badge-none     { background: rgba(58,96,128,0.1);   border: 1px solid rgba(58,96,128,0.2);  color: #3a6080; }
+
+/* ── Scanline effect ───────────── */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* ── CRT vignette ──────────────── */
+.crt-vignette::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* ── Number value ──────────────── */
+.value-up   { color: var(--green); }
+.value-down { color: var(--red); }
+.value-flat { color: var(--text); }
+
+/* ── Progress bar ──────────────── */
+.progress-bar {
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 1s ease;
+}
