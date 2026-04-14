@@ -305,7 +305,8 @@ export default function WorldMap() {
   const panelOpen = !!detail;
 
   return (
-    <div className="relative w-full h-full overflow-hidden select-none" style={{ background: '#020c18' }}>
+    <div className="relative w-full h-full overflow-hidden select-none"
+         style={{ background: '#020c18', isolation: 'isolate', touchAction: 'none' }}>
 
       {/* ── Stat bar ────────────────────────────── */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-3 px-3 py-1.5 backdrop-blur-sm"
