@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { NewsItem } from '@/lib/types';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const revalidate = 0;
 
 // Module-level cache — prevents hammering 30+ RSS feeds on every page load
-interface NewsCache { news: NewsItem[]; updatedAt: string; sourceCount: number; }
+interface NewsCache { news: NewsItem[]; articles: NewsItem[]; updatedAt: string; sourceCount: number; }
 let cachedNews: NewsCache | null = null;
 let newsCacheTime = 0;
 const NEWS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -479,6 +479,7 @@ export async function GET() {
 
   const payload: NewsCache = {
     news: final.slice(0, 60),
+    articles: final.slice(0, 60),   // alias — component reads 'articles'
     updatedAt: new Date().toISOString(),
     sourceCount: RSS_FEEDS.length,
   };
