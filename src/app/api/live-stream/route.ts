@@ -7,11 +7,13 @@ let cachedId:   string | null = null;
 let cachedTime = 0;
 const TTL = 10 * 60 * 1000;
 
-// Known AJ English YouTube live stream IDs to try if scrape fails
-// These are historical fallback IDs — AJ maintains persistent live streams
+// Primary live stream ID (user-verified working)
+const PRIMARY_ID = 'gCNeDWCI0vo';
+
+// Fallback IDs if scrape fails
 const KNOWN_FALLBACK_IDS = [
-  'tudkuJBe-I4',  // AJ English Live persistent
-  'coYnMTkj0KI',  // backup
+  PRIMARY_ID,
+  'tudkuJBe-I4',
 ];
 
 async function scrapeChannelLiveId(handle: string): Promise<string | null> {
@@ -57,19 +59,20 @@ export async function GET() {
     return NextResponse.json({ videoId: cachedId, source: 'cache' });
   }
 
-  // Try scraping the live URL
-  let videoId = await scrapeChannelLiveId('AJEnglish');
+  // Always start with the user-verified primary ID
+  let videoId: string = PRIMARY_ID;
+  let source  = 'primary';
 
-  // If scrape didn't yield a usable ID, try the known fallbacks
-  if (!videoId) {
-    videoId = KNOWN_FALLBACK_IDS[0];
-  }
+  // Try scraping for a more current live stream ID (non-blocking best-effort)
+  try {
+    const scraped = await scrapeChannelLiveId('AJEnglish');
+    if (scraped && scraped !== PRIMARY_ID) {
+      videoId = scraped;
+      source  = 'live';
+    }
+  } catch { /* keep primary */ }
 
-  if (videoId) {
-    cachedId   = videoId;
-    cachedTime = Date.now();
-    return NextResponse.json({ videoId, source: videoId === KNOWN_FALLBACK_IDS[0] ? 'fallback' : 'live' });
-  }
-
-  return NextResponse.json({ videoId: null }, { status: 404 });
+  cachedId   = videoId;
+  cachedTime = Date.now();
+  return NextResponse.json({ videoId, source });
 }
