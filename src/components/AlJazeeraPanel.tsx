@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface NewsItem {
   title:       string;
@@ -62,42 +62,18 @@ function timeAgo(dateStr: string) {
   return `${Math.round(diff / 3600)}h ago`;
 }
 
+const AJ_VIDEO_ID = 'gCNeDWCI0vo';
+
 // ── Live Video component ──────────────────────────────────────────────────────
 function LiveVideo() {
-  const [videoId, setVideoId]   = useState<string | null>(null);
-  const [loading, setLoading]   = useState(true);
   const [iframeErr, setIframeErr] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const r = await fetch('/api/live-stream');
-        const d = await r.json();
-        if (!cancelled && d.videoId) setVideoId(d.videoId);
-      } catch { /* ignore */ } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black">
-        <div className="w-4 h-4 border-2 border-terminal-red border-t-transparent rounded-full animate-spin" />
-        <span className="text-[8px] text-terminal-dim font-['Orbitron'] tracking-wider">FETCHING LIVE FEED…</span>
-      </div>
-    );
-  }
-
-  if (!videoId || iframeErr) {
+  if (iframeErr) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-terminal-surface">
         <div className="text-[22px]">📺</div>
         <div className="text-terminal-text text-[9px] text-center px-4">Al Jazeera Live — stream unavailable</div>
-        <a href="https://www.aljazeera.com/live/" target="_blank" rel="noopener noreferrer"
+        <a href={`https://www.youtube.com/watch?v=${AJ_VIDEO_ID}`} target="_blank" rel="noopener noreferrer"
            className="text-[9px] text-terminal-blue underline font-['Orbitron'] tracking-wider">
           OPEN AJ LIVE ↗
         </a>
@@ -108,14 +84,13 @@ function LiveVideo() {
   return (
     <div className="relative w-full h-full bg-black">
       <iframe
-        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=1&rel=0&modestbranding=1&playsinline=1`}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        src={`https://www.youtube.com/embed/${AJ_VIDEO_ID}?autoplay=1&mute=1&controls=1&rel=0&modestbranding=1&playsinline=1`}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
         className="w-full h-full border-0"
         title="Al Jazeera English Live"
         onError={() => setIframeErr(true)}
       />
-      {/* Live badge overlay */}
       <div className="absolute top-1.5 left-1.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-2 py-1 rounded pointer-events-none">
         <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
         <span className="text-white text-[8px] font-['Orbitron'] tracking-wider font-bold">AJ ENGLISH</span>
