@@ -128,7 +128,7 @@ export default function AnalysisPanel({ type, accentColor = 'var(--blue)' }: Pro
       const r   = await fetch(url, { cache: 'no-store' });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
-        throw new Error(d.error ?? `HTTP ${r.status}`);
+        throw new Error(d.detail ?? d.error ?? `HTTP ${r.status}`);
       }
       const d: AnalysisResult = await r.json();
       setAnalysis(d);

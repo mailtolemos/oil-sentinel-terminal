@@ -10,10 +10,10 @@ export interface Recommendation {
   symbol: string;
   action: 'BUY' | 'SELL' | 'HOLD' | 'WATCH';
   currentPrice: number;
-  entryZone: string;      // e.g. "$78.00–$79.50"
-  target: string;         // e.g. "$85.00"
-  stopLoss: string;       // e.g. "$75.00"
-  timeframe: string;      // e.g. "2–4 WEEKS"
+  entryZone: string;
+  target: string;
+  stopLoss: string;
+  timeframe: string;
   confidence: 'HIGH' | 'MEDIUM' | 'LOW';
   rationale: string;
   risks: string[];
@@ -23,8 +23,8 @@ export interface AnalysisResult {
   type: 'oil' | 'minerals';
   generatedAt: string;
   nextUpdateAt: string;
-  outlookLabel: string;       // e.g. "BEARISH", "CAUTIOUSLY BULLISH"
-  outlookScore: number;       // -100 (bearish) to +100 (bullish)
+  outlookLabel: string;
+  outlookScore: number;
   executiveSummary: string;
   recommendations: Recommendation[];
   keyLevels: { label: string; price: string; significance: string }[];
@@ -36,215 +36,276 @@ export interface AnalysisResult {
 const cache: Record<string, { result: AnalysisResult; ts: number }> = {};
 const CACHE_TTL = 60 * 60 * 1_000; // 1 hour
 
-const BASE = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'http://localhost:3000';
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
-// ── Fetch helpers ─────────────────────────────────────────────────────────────
-async function fetchJSON(path: string) {
+// ── Pyth: fetch spot prices directly ─────────────────────────────────────────
+const PYTH_OIL: Record<string, string> = {
+  WTI: '925ca92ff005ae943c158e3563f59698ce7e75c5a8c8dd43303a0a154887b3e6',
+  BRT: '27f0d5e09a830083e5491795cac9ca521399c8f7fd56240d09484b14e614d57a',
+};
+const PYTH_METALS: Record<string, string> = {
+  XAU: '765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2',
+  XAG: 'f2fb02c32b055c805e7238d628e5e9dadef274376114eb1f012337cabe93871e',
+  XPT: '398e4bbc7cbf89d6648c21e08019d878967677753b3096799595c78f805a34e5',
+};
+
+async function fetchPyth(feedMap: Record<string, string>): Promise<Record<string, number>> {
   try {
-    const r = await fetch(`${BASE}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
-    return r.ok ? r.json() : null;
-  } catch { return null; }
+    const ids = Object.values(feedMap).map(id => `ids[]=${id}`).join('&');
+    const url  = `https://hermes.pyth.network/v2/updates/price/latest?${ids}`;
+    const r    = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(7000) });
+    if (!r.ok) return {};
+    const data = await r.json();
+    const idToSym = Object.fromEntries(Object.entries(feedMap).map(([s, id]) => [id, s]));
+    const out: Record<string, number> = {};
+    for (const item of data?.parsed ?? []) {
+      const sym = idToSym[item.id];
+      if (!sym) continue;
+      const expo  = parseInt(item.price.expo, 10);
+      const price = parseInt(item.price.price, 10) * Math.pow(10, expo);
+      if (price > 0) out[sym] = price;
+    }
+    return out;
+  } catch { return {}; }
+}
+
+// ── Stooq: fetch single quote ─────────────────────────────────────────────────
+async function fetchStooq(sym: string): Promise<number> {
+  try {
+    const url   = `https://stooq.com/q/l/?s=${sym}&f=sd2t2ohlcv&h&e=csv`;
+    const r     = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(7000) });
+    if (!r.ok) return 0;
+    const text  = await r.text();
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return 0;
+    const parts = lines[1].split(',');
+    return parseFloat(parts[6] ?? '0') || 0;
+  } catch { return 0; }
+}
+
+// ── RSS fetch: grab a handful of headlines ────────────────────────────────────
+async function fetchRssHeadlines(url: string, limit = 5): Promise<string[]> {
+  try {
+    const r    = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return [];
+    const text = await r.text();
+    const titles: string[] = [];
+    const re   = /<title>(.*?)<\/title>/gi;
+    let m;
+    let count  = 0;
+    while ((m = re.exec(text)) !== null && count < limit) {
+      const raw = m[1];
+    const t = raw.replace(/<!\[CDATA\[[\s\S]*?\]\]>/, (c: string) => c.slice(9, c.length - 3)).replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#\d+;/g,'').trim();
+      if (t && t.length > 10) { titles.push(t); count++; }
+    }
+    return titles;
+  } catch { return []; }
 }
 
 // ── Build oil context ─────────────────────────────────────────────────────────
-async function buildOilContext() {
-  const [priceData, newsData, shipData] = await Promise.all([
-    fetchJSON('/api/prices'),
-    fetchJSON('/api/news'),
-    fetchJSON('/api/ships'),
+async function buildOilContext(): Promise<string> {
+  // Fetch prices in parallel
+  const [pyth, wtiStooq, brtStooq, hhStooq, goStooq, rbStooq, reutersHeads, oilpriceHeads] = await Promise.all([
+    fetchPyth(PYTH_OIL),
+    fetchStooq('cl.f'),
+    fetchStooq('cb.f'),
+    fetchStooq('ng.f'),
+    fetchStooq('ho.f'),
+    fetchStooq('rb.f'),
+    fetchRssHeadlines('https://feeds.reuters.com/reuters/businessNews', 6),
+    fetchRssHeadlines('https://oilprice.com/rss/main', 6),
   ]);
 
-  const prices: Record<string, { price: number; change: number; changePct: number; high: number; low: number }> = {};
-  for (const p of priceData?.prices ?? []) {
-    prices[p.symbol] = { price: p.price, change: p.change, changePct: p.changePct, high: p.high, low: p.low };
-  }
+  const brt = pyth['BRT'] || brtStooq || 0;
+  const wti = pyth['WTI'] || wtiStooq || 0;
+  const hh  = hhStooq || 0;
+  const go  = goStooq || 0;
+  const rb  = rbStooq || 0;
 
-  const brt = prices['BRT'];
-  const wti = prices['WTI'];
-  const hh  = prices['HH'];
-  const rb  = prices['RB'];
-  const go  = prices['GO'];
-
-  const spread = brt && wti ? (brt.price - wti.price).toFixed(2) : 'N/A';
+  const spread = brt && wti ? (brt - wti).toFixed(2) : 'N/A';
   const crack  = rb && go && wti
-    ? ((2 * rb.price * 42 + go.price * 42 - 3 * wti.price) / 3).toFixed(2)
+    ? ((2 * rb * 42 + go * 42 - 3 * wti) / 3).toFixed(2)
     : 'N/A';
 
-  const headlines = (newsData?.news ?? []).slice(0, 12)
-    .map((n: { title: string; direction: string; impactScore: number; source: string }) =>
-      `• [${n.direction.toUpperCase()} | score:${n.impactScore}] ${n.title} (${n.source})`)
-    .join('\n');
-
-  const threats = (shipData?.threats ?? [])
-    .filter((t: { active: boolean }) => t.active)
-    .slice(0, 8)
-    .map((t: { severity: string; title: string; region: string; impact: string }) =>
-      `• [${t.severity.toUpperCase()}] ${t.title} — ${t.region}: ${t.impact}`)
-    .join('\n');
-
-  const chokepoints = (shipData?.chokepoints ?? [])
-    .map((c: { name: string; status: string; throughputMbpd: number; riskLevel: number }) =>
-      `• ${c.name}: ${c.status.toUpperCase()} (${c.throughputMbpd} Mb/d, risk ${c.riskLevel}/5)`)
+  const headlines = [...reutersHeads, ...oilpriceHeads]
+    .filter(Boolean)
+    .slice(0, 10)
+    .map(h => `• ${h}`)
     .join('\n');
 
   return `
-=== PABLO INTEL — OIL MARKET DATA SNAPSHOT (${new Date().toUTCString()}) ===
+=== OIL MARKET DATA SNAPSHOT (${new Date().toUTCString()}) ===
 
-CURRENT PRICES:
-• Brent Crude (BRT): $${brt?.price ?? 'N/A'}/bbl  Δ${brt?.changePct ?? 0}%  [H:${brt?.high ?? '-'} / L:${brt?.low ?? '-'}]
-• WTI Crude (WTI):   $${wti?.price ?? 'N/A'}/bbl  Δ${wti?.changePct ?? 0}%  [H:${wti?.high ?? '-'} / L:${wti?.low ?? '-'}]
-• Henry Hub (HH):    $${hh?.price ?? 'N/A'}/MMBtu Δ${hh?.changePct ?? 0}%
-• RBOB Gasoline (RB):$${rb?.price ?? 'N/A'}/gal   Δ${rb?.changePct ?? 0}%
-• Heating Oil (GO):  $${go?.price ?? 'N/A'}/gal   Δ${go?.changePct ?? 0}%
+CURRENT PRICES (sources: Pyth Network spot + Stooq futures):
+• Brent Crude (BRT): $${brt > 0 ? brt.toFixed(2) : 'N/A'}/bbl   [${pyth['BRT'] ? 'Pyth live' : 'Stooq futures'}]
+• WTI Crude (WTI):   $${wti > 0 ? wti.toFixed(2) : 'N/A'}/bbl   [${pyth['WTI'] ? 'Pyth live' : 'Stooq futures'}]
+• Henry Hub (HH):    $${hh  > 0 ? hh.toFixed(3) : 'N/A'}/MMBtu  [Stooq futures]
+• RBOB Gasoline:     $${rb  > 0 ? rb.toFixed(4)  : 'N/A'}/gal   [Stooq futures]
+• Heating Oil:       $${go  > 0 ? go.toFixed(4)  : 'N/A'}/gal   [Stooq futures]
 
-KEY DERIVED METRICS:
-• Brent–WTI spread: $${spread}/bbl
-• 3-2-1 Crack spread: $${crack}/bbl
-• OPEC+ spare capacity: ~3.2 Mb/d (historically tight)
-• US SPR: ~360 Mb (~40-year low, refill ongoing)
+DERIVED METRICS:
+• Brent–WTI spread:  $${spread}/bbl (>$3 = wide; <$1 = tight)
+• 3-2-1 Crack spread: $${crack}/bbl (>$25 = strong margins; <$15 = compressed)
+• OPEC+ spare capacity: ~3.2 Mb/d (historically tight — bullish structural support)
+• US Strategic Petroleum Reserve: ~360 Mb (near 40-year low)
+• US Dollar Index: elevated — headwind for USD-priced commodities
 
-GEOPOLITICAL / CHOKEPOINTS:
-${chokepoints || 'No data'}
+GEOPOLITICAL CONTEXT:
+• Strait of Hormuz: elevated tension — 21 Mb/d (20% global supply) at risk
+• Red Sea: Houthi disruptions ongoing — tankers rerouting via Cape (+10 days, +$1–2M/voyage)
+• Russia: ~3.5 Mb/d under G7 price cap — sanctions compliance uncertain
+• Libya: Sharara field sporadically disrupted (~0.3 Mb/d)
+• Iran: nuclear negotiations status — sanctions risk premium embedded
+• OPEC+ next scheduled meeting: policy unchanged, voluntary cuts maintained
 
-ACTIVE THREAT MATRIX:
-${threats || 'No active threats logged'}
-
-RECENT MARKET INTELLIGENCE (news, last 24h):
-${headlines || 'No recent news'}
+RECENT MARKET HEADLINES:
+${headlines || '• No headlines retrieved'}
 `.trim();
 }
 
 // ── Build minerals context ────────────────────────────────────────────────────
-async function buildMineralsContext() {
-  const [metalData, newsData] = await Promise.all([
-    fetchJSON('/api/metals'),
-    fetchJSON('/api/minerals-news'),
+async function buildMineralsContext(): Promise<string> {
+  const [pyth, xpdStooq, cuStooq, kitcoHeads, miningHeads] = await Promise.all([
+    fetchPyth(PYTH_METALS),
+    fetchStooq('pa.f'),
+    fetchStooq('hg.f'),
+    fetchRssHeadlines('https://www.kitco.com/rss/kitconews.xml', 6),
+    fetchRssHeadlines('https://www.mining.com/feed/', 6),
   ]);
 
-  const metals: Record<string, { price: number; change: number; changePct: number; source: string }> = {};
-  for (const m of metalData?.metals ?? []) {
-    metals[m.symbol] = { price: m.price, change: m.change, changePct: m.changePct, source: m.source };
-  }
+  const xau = pyth['XAU'] || 0;
+  const xag = pyth['XAG'] || 0;
+  const xpt = pyth['XPT'] || 0;
+  const xpd = xpdStooq || 0;
+  const cu  = cuStooq || 0;
 
-  const xau = metals['XAU'];
-  const xag = metals['XAG'];
-  const xpt = metals['XPT'];
-  const xpd = metals['XPD'];
-  const cu  = metals['CU'];
+  const gsRatio  = xau && xag ? (xau / xag).toFixed(1) : 'N/A';
+  const ptPdSprd = xpt && xpd ? (xpt - xpd).toFixed(0) : 'N/A';
 
-  const gsRatio  = xau && xag ? (xau.price / xag.price).toFixed(1) : 'N/A';
-  const ptPdSprd = xpt && xpd ? (xpt.price - xpd.price).toFixed(0) : 'N/A';
-
-  const headlines = (newsData?.articles ?? []).slice(0, 12)
-    .map((n: { title: string; minerals: string[]; source: string }) =>
-      `• [${(n.minerals ?? []).join(',')||'GENERAL'}] ${n.title} (${n.source})`)
+  const headlines = [...kitcoHeads, ...miningHeads]
+    .filter(Boolean)
+    .slice(0, 10)
+    .map(h => `• ${h}`)
     .join('\n');
 
   return `
-=== PABLO INTEL — MINERALS MARKET DATA SNAPSHOT (${new Date().toUTCString()}) ===
+=== MINERALS & METALS DATA SNAPSHOT (${new Date().toUTCString()}) ===
 
-CURRENT PRICES (source noted):
-• Gold (XAU):     $${xau?.price?.toFixed(2) ?? 'N/A'}/oz  Δ${xau?.changePct ?? 0}% [${xau?.source ?? '-'}]
-• Silver (XAG):   $${xag?.price?.toFixed(3) ?? 'N/A'}/oz  Δ${xag?.changePct ?? 0}% [${xag?.source ?? '-'}]
-• Platinum (XPT): $${xpt?.price?.toFixed(2) ?? 'N/A'}/oz  Δ${xpt?.changePct ?? 0}% [${xpt?.source ?? '-'}]
-• Palladium (XPD):$${xpd?.price?.toFixed(2) ?? 'N/A'}/oz  Δ${xpd?.changePct ?? 0}% [${xpd?.source ?? '-'}]
-• Copper (CU):    $${cu?.price?.toFixed(3)  ?? 'N/A'}/lb  Δ${cu?.changePct  ?? 0}% [${cu?.source  ?? '-'}]
+CURRENT PRICES (sources: Pyth Network spot + Stooq futures):
+• Gold (XAU):      $${xau > 0 ? xau.toFixed(2) : 'N/A'}/oz   [${pyth['XAU'] ? 'Pyth live' : 'unavailable'}]
+• Silver (XAG):    $${xag > 0 ? xag.toFixed(3) : 'N/A'}/oz   [${pyth['XAG'] ? 'Pyth live' : 'unavailable'}]
+• Platinum (XPT):  $${xpt > 0 ? xpt.toFixed(2) : 'N/A'}/oz   [${pyth['XPT'] ? 'Pyth live' : 'unavailable'}]
+• Palladium (XPD): $${xpd > 0 ? xpd.toFixed(2) : 'N/A'}/oz   [Stooq futures]
+• Copper (CU):     $${cu  > 0 ? cu.toFixed(4)  : 'N/A'}/lb   [Stooq futures — multiply by 2204 for $/tonne]
 
-KEY RATIOS & SPREADS:
-• Gold/Silver ratio: ${gsRatio}x  (>90 = silver historically cheap; ~80 = normal)
-• Platinum–Palladium spread: $${ptPdSprd}/oz  (positive = Pt premium, negative = Pd premium)
+KEY RATIOS:
+• Gold/Silver ratio: ${gsRatio}x
+  - Historical mean: ~67x | >90x = silver cheap vs gold | <60x = silver expensive
+• Platinum–Palladium spread: $${ptPdSprd}
+  - Positive = Pt trading at premium; negative = Pd at premium
+  - EV transition is bearish for Pd (less catalytic converter demand), neutral-bullish for Pt
 
-STRUCTURAL SUPPLY CONTEXT:
-• China REE/Gallium/Germanium export controls: ACTIVE since 2023
-• DRC Cobalt production: 70% global share — exposed to political risk
-• South Africa PGMs: Eskom load shedding constraining output (Stage 4–6)
-• Russia Palladium: 40% global supply under G7 sanctions pressure
-• Chile Copper: 27% global share — royalty legislation risk pending
-• Indonesia Nickel: Export ban reshaping global supply chain
-• Kazatomprom (Kazakhstan): Controls 45% global uranium production
+STRUCTURAL SUPPLY DISRUPTIONS:
+• China REE controls: gallium, germanium, graphite export restrictions ACTIVE since Aug 2023
+• DRC Cobalt: 70% global share — political instability risk elevated
+• South Africa PGMs: Eskom load shedding reducing smelter output (Stage 4–6)
+• Russia Palladium: 40% global supply — G7 sanctions creating supply uncertainty
+• Chile Copper: 27% global share — royalty bill risk, water scarcity pressuring costs
+• Indonesia Nickel: export ban reshaping global supply chain dynamics
+• Kazatomprom: 45% global uranium production — strategic leverage
 
-RECENT MARKET INTELLIGENCE:
-${headlines || 'No recent news'}
+MACRO CONTEXT:
+• Fed rate trajectory: elevated rates = stronger USD = headwind for metals
+• Central bank gold buying: >1,000 tonnes/year — structural floor for XAU
+• Battery metals demand: LFP adoption reducing cobalt/nickel intensity per EV
+
+RECENT MARKET HEADLINES:
+${headlines || '• No headlines retrieved'}
 `.trim();
 }
 
 // ── Claude analysis prompt ────────────────────────────────────────────────────
 function buildPrompt(type: 'oil' | 'minerals', context: string): string {
   const assetList = type === 'oil'
-    ? 'Brent Crude (BRT), WTI Crude (WTI), Henry Hub Gas (HH), RBOB Gasoline (RB), Heating Oil (GO)'
+    ? 'Brent Crude (BRT), WTI Crude (WTI), Henry Hub Natural Gas (HH)'
     : 'Gold (XAU), Silver (XAG), Platinum (XPT), Palladium (XPD), Copper (CU)';
 
-  return `You are a senior commodities analyst at an institutional trading desk. You have just received the following live market data snapshot.
+  return `You are a senior commodities analyst at an institutional trading desk with 20 years of experience. You have just received the following live market data.
 
 ${context}
 
-Based ONLY on this real data, produce an honest, specific, actionable market analysis for retail and institutional traders. Be direct — avoid hedging language like "may", "could", "might" unless genuinely uncertain. Give specific price levels.
+Based ONLY on this real data, produce a direct, actionable market analysis for traders. Be specific with numbers. Do not hedge with "may" or "could" unless genuinely uncertain. Reference actual prices from the data.
 
 Assets to cover: ${assetList}
 
-Respond with ONLY a valid JSON object matching this exact schema (no markdown, no explanation, just the JSON):
+Return ONLY a valid JSON object. No markdown. No explanation outside the JSON. No code fences. Start directly with { and end with }.
 
+Schema:
 {
-  "outlookLabel": "string (e.g. BEARISH, CAUTIOUSLY BULLISH, NEUTRAL, STRONGLY BULLISH)",
-  "outlookScore": number (-100 to +100, negative=bearish, positive=bullish),
-  "executiveSummary": "string (3–4 sentences: current state, key driver, main risk, actionable bottom line)",
+  "outlookLabel": "one of: STRONGLY BEARISH, BEARISH, CAUTIOUSLY BEARISH, NEUTRAL, CAUTIOUSLY BULLISH, BULLISH, STRONGLY BULLISH",
+  "outlookScore": integer from -100 to 100,
+  "executiveSummary": "3-4 sentences: current market state, primary driver, main risk, actionable bottom line. Be specific.",
   "recommendations": [
     {
-      "commodity": "Full name e.g. Brent Crude",
+      "commodity": "full name e.g. Brent Crude",
       "symbol": "BRT",
-      "action": "BUY | SELL | HOLD | WATCH",
-      "currentPrice": number,
-      "entryZone": "e.g. $78.00–$79.50 or 'current'",
-      "target": "e.g. $85.00",
-      "stopLoss": "e.g. $75.50",
-      "timeframe": "e.g. 2–4 WEEKS",
-      "confidence": "HIGH | MEDIUM | LOW",
-      "rationale": "2–3 sentences explaining WHY with specific reference to the data above",
-      "risks": ["risk 1", "risk 2"]
+      "action": "BUY or SELL or HOLD or WATCH",
+      "currentPrice": number (use exact price from data, 0 if unavailable),
+      "entryZone": "specific price range like $78.00-$79.50 or 'at market' if already at entry",
+      "target": "specific price like $85.00",
+      "stopLoss": "specific price like $75.50",
+      "timeframe": "e.g. 1-2 WEEKS or 1-3 MONTHS",
+      "confidence": "HIGH or MEDIUM or LOW",
+      "rationale": "2-3 sentences with specific numbers from the data. Explain WHY now.",
+      "risks": ["specific risk 1", "specific risk 2"]
     }
   ],
   "keyLevels": [
-    { "label": "e.g. Brent key support", "price": "$78.50", "significance": "one sentence" }
+    { "label": "e.g. Brent key support", "price": "$78.50", "significance": "one sentence explaining why this level matters" }
   ],
   "catalysts": [
-    { "date": "e.g. Wed 15:30 UTC", "event": "EIA Crude Inventory", "impact": "one sentence on expected market impact" }
+    { "date": "e.g. Wed 15:30 UTC", "event": "EIA Crude Inventory", "impact": "one sentence on expected market reaction" }
   ],
-  "disclaimer": "short 1-sentence risk disclaimer"
+  "disclaimer": "one sentence risk disclaimer"
 }
 
 Rules:
-- Include a recommendation for EACH asset
-- Use the actual live prices from the data for currentPrice
-- Be specific with price levels based on technical analysis inferred from high/low/current
-- If data shows a commodity is trending up strongly, say BUY and say why
-- If bearish pressure is evident, say SELL or WATCH
-- The rationale MUST reference specific numbers from the data (e.g. "crack spread at $X signals...")
-- Keep each rationale under 60 words
-- Maximum 3 keyLevels and 4 catalysts`;
+- Include a recommendation for EVERY asset listed above
+- Use prices from the data for currentPrice (use 0 if price shows as N/A)
+- Entry zones should be slightly below current for BUY, above for SELL, based on support/resistance inference
+- Rationale MUST cite at least one specific number from the data
+- Keep rationale under 55 words
+- Maximum 4 keyLevels, maximum 4 catalysts`;
+}
+
+// ── Extract JSON from Claude response (handles any wrapping) ─────────────────
+function extractJSON(raw: string): string {
+  // Try to find JSON between first { and last }
+  const start = raw.indexOf('{');
+  const end   = raw.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('No JSON object found in response');
+  return raw.slice(start, end + 1);
 }
 
 // ── Parse and validate Claude response ───────────────────────────────────────
 function parseAnalysis(raw: string, type: 'oil' | 'minerals'): AnalysisResult {
-  // Strip any markdown code fences if present
-  const cleaned = raw.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-  const parsed  = JSON.parse(cleaned);
+  const json   = extractJSON(raw);
+  const parsed = JSON.parse(json);
 
-  const now     = new Date();
-  const nextHr  = new Date(now.getTime() + CACHE_TTL);
+  const now    = new Date();
+  const nextHr = new Date(now.getTime() + CACHE_TTL);
 
   return {
     type,
     generatedAt:      now.toISOString(),
     nextUpdateAt:     nextHr.toISOString(),
-    outlookLabel:     parsed.outlookLabel     ?? 'NEUTRAL',
-    outlookScore:     parsed.outlookScore     ?? 0,
-    executiveSummary: parsed.executiveSummary ?? '',
-    recommendations:  parsed.recommendations  ?? [],
-    keyLevels:        parsed.keyLevels        ?? [],
-    catalysts:        parsed.catalysts        ?? [],
-    disclaimer:       parsed.disclaimer       ?? 'All recommendations are for informational purposes only. Not financial advice.',
+    outlookLabel:     String(parsed.outlookLabel     ?? 'NEUTRAL'),
+    outlookScore:     Number(parsed.outlookScore     ?? 0),
+    executiveSummary: String(parsed.executiveSummary ?? ''),
+    recommendations:  Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+    keyLevels:        Array.isArray(parsed.keyLevels)        ? parsed.keyLevels : [],
+    catalysts:        Array.isArray(parsed.catalysts)        ? parsed.catalysts : [],
+    disclaimer:       String(parsed.disclaimer ?? 'All recommendations are for informational purposes only. Not financial advice.'),
   };
 }
 
@@ -252,7 +313,7 @@ function parseAnalysis(raw: string, type: 'oil' | 'minerals'): AnalysisResult {
 export async function GET(req: NextRequest) {
   const type = (req.nextUrl.searchParams.get('type') ?? 'oil') as 'oil' | 'minerals';
 
-  // Return cached result if fresh
+  // Return cache unless force-refreshed
   const cached = cache[type];
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
     return NextResponse.json({ ...cached.result, cached: true });
@@ -260,37 +321,52 @@ export async function GET(req: NextRequest) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'ANTHROPIC_API_KEY not set', detail: 'Add ANTHROPIC_API_KEY to Vercel environment variables (project settings → Environment Variables)' },
+      { status: 503 }
+    );
   }
 
+  let context = '';
   try {
-    // Build context from live data
-    const context = type === 'oil'
+    context = type === 'oil'
       ? await buildOilContext()
       : await buildMineralsContext();
+  } catch (ctxErr) {
+    return NextResponse.json(
+      { error: 'Data fetch failed', detail: `Could not gather market data: ${String(ctxErr)}` },
+      { status: 500 }
+    );
+  }
 
-    const prompt = buildPrompt(type, context);
+  const prompt = buildPrompt(type, context);
 
-    // Call Claude
+  let raw = '';
+  try {
     const anthropic = new Anthropic({ apiKey });
     const message = await anthropic.messages.create({
       model:      'claude-haiku-4-5-20251001',
       max_tokens: 2048,
       messages:   [{ role: 'user', content: prompt }],
     });
-
-    const raw = (message.content[0] as { type: string; text: string }).text;
-    const result = parseAnalysis(raw, type);
-
-    // Store in cache
-    cache[type] = { result, ts: Date.now() };
-
-    return NextResponse.json(result);
-  } catch (err) {
-    console.error('Analysis error:', err);
+    raw = (message.content[0] as { type: string; text: string }).text ?? '';
+  } catch (aiErr) {
     return NextResponse.json(
-      { error: 'Analysis generation failed', detail: String(err) },
+      { error: 'Claude API call failed', detail: String(aiErr) },
       { status: 500 }
     );
   }
+
+  let result: AnalysisResult;
+  try {
+    result = parseAnalysis(raw, type);
+  } catch (parseErr) {
+    return NextResponse.json(
+      { error: 'Response parse failed', detail: `Could not parse AI response: ${String(parseErr)}. Raw (first 300 chars): ${raw.slice(0, 300)}` },
+      { status: 500 }
+    );
+  }
+
+  cache[type] = { result, ts: Date.now() };
+  return NextResponse.json(result);
 }
