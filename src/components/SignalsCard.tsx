@@ -139,10 +139,11 @@ export default function SignalsCard({ hovered }: { hovered: boolean }) {
     return () => clearInterval(iv);
   }, []);
 
-  const symbols  = ['BTC', 'GOLD', 'USOIL'];
   const signals  = data?.signals ?? {};
-  const hasAny   = Object.keys(signals).length > 0;
+  const availableSymbols = Object.keys(signals).sort();
+  const hasAny   = availableSymbols.length > 0;
   const lastSync = data?.updatedAt ? timeAgo(data.updatedAt) : null;
+  const displaySymbols = availableSymbols.slice(0, 3); // Show top 3
 
   return (
     <div
@@ -164,7 +165,7 @@ export default function SignalsCard({ hovered }: { hovered: boolean }) {
             LIVE SIGNALS
           </div>
           <div className="text-[8px] font-['Orbitron'] text-terminal-dim tracking-wider mt-0.5">
-            BTC · GOLD · USOIL — Supreme Signal Engine
+            {displaySymbols.join(' · ') || 'Generating signals…'} — RSI · Trend · Analysis
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -196,25 +197,14 @@ export default function SignalsCard({ hovered }: { hovered: boolean }) {
                 Awaiting Signals
               </div>
               <div className="text-[8px] text-terminal-dim mt-1 opacity-70">
-                Scheduled tasks fire every 10 minutes
+                Computing market indicators…
               </div>
             </div>
           </div>
         )}
 
-        {!loading && hasAny && symbols.map(sym => {
+        {!loading && hasAny && displaySymbols.map(sym => {
           const s = signals[sym];
-          if (!s) return (
-            <div key={sym} className="flex items-center gap-2 px-3 py-2.5 rounded border border-terminal-border bg-terminal-surface/40">
-              <div className="w-7 h-7 rounded border border-terminal-border bg-terminal-surface flex items-center justify-center text-terminal-dim text-[10px] font-bold">
-                {sym[0]}
-              </div>
-              <div>
-                <div className="text-[10px] font-['Orbitron'] text-terminal-dim tracking-wider">{sym}</div>
-                <div className="text-[8px] text-terminal-dim opacity-60">signal pending…</div>
-              </div>
-            </div>
-          );
           return <SignalRow key={sym} signal={s} />;
         })}
       </div>

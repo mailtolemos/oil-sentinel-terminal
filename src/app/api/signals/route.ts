@@ -75,21 +75,27 @@ export async function GET(request: NextRequest): Promise<NextResponse<SignalsPay
 }
 
 /**
- * POST: Accept manual signal updates
+ * POST: Accept manual signal updates (for testing only - not persisted in serverless)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
     if (body.signals) {
+      // Merge with existing cached signals
       cachedSignals = { ...cachedSignals, ...body.signals };
       lastUpdate = new Date().toISOString();
     }
 
+    // Return current state (live + cached)
+    const liveSignals = await generateLiveSignals();
+    const mergedSignals = { ...cachedSignals, ...liveSignals };
+
     return NextResponse.json({
       success: true,
       updatedAt: lastUpdate,
-      count: Object.keys(cachedSignals).length,
+      count: Object.keys(mergedSignals).length,
+      source: "merged",
     });
   } catch (error) {
     return NextResponse.json(
