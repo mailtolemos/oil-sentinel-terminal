@@ -1,78 +1,239 @@
-import { NextRequest, NextResponse } from 'next/server';
+/**
+ * API Route for Trading Signals
+ * GET: Returns current signals (fetched and calculated)
+ * POST: Manual signal updates (with optional auth)
+ *
+ * File location: src/app/api/signals/route.ts
+ */
 
-export const runtime = 'nodejs';
-export const revalidate = 0;
+import { NextRequest, NextResponse } from "next/server";
+import { generateSignalsFromPrices, SignalConfig } from "@/lib/signalEngine";
 
-// ── Signal types ──────────────────────────────────────────────────────────────
-export type SignalAction = 'BUY' | 'SELL' | 'HOLD' | 'WATCH';
+// In-memory store for manual signals (fallback/manual overrides)
+let signalsStore: Record<string, any> = {};
+let storeLastUpdate: string = new Date().toISOString();
 
-export interface AssetSignal {
-  symbol:      string;           // BTC, GOLD, USOIL
-  name:        string;           // Bitcoin, Gold, WTI Crude
-  action:      SignalAction;
-  price:       number;
-  priceStr:    string;           // formatted, e.g. "$94,500" or "$2,310.50"
-  change:      number;           // % change on the day
-  entryZone:   string;
-  target:      string;
-  stopLoss:    string;
-  timeframe:   string;
-  confidence:  'HIGH' | 'MEDIUM' | 'LOW';
-  rationale:   string;
-  indicators?: string;           // optional: RSI, EMA status, etc.
-  updatedAt:   string;           // ISO timestamp
-}
-
-export interface SignalsPayload {
-  signals:     Record<string, AssetSignal>;  // keyed by symbol
-  updatedAt:   string;
-}
-
-// ── In-memory store ───────────────────────────────────────────────────────────
-let store: SignalsPayload = {
-  signals:   {},
-  updatedAt: '',
-};
-
-// ── GET: return current signals ───────────────────────────────────────────────
-export async function GET() {
-  return NextResponse.json(store);
-}
-
-// ── POST: update one or more signals (requires auth token) ────────────────────
-export async function POST(req: NextRequest) {
-  const secret = process.env.SIGNALS_SECRET;
-
-  // If SIGNALS_SECRET is set, require it; if not configured, allow open writes
-  if (secret) {
-    const auth = req.headers.get('authorization') ?? '';
-    const token = auth.replace(/^Bearer\s+/i, '').trim();
-    if (token !== secret) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-  }
-
-  let body: Partial<SignalsPayload> & { signal?: AssetSignal };
+/**
+ * GET: Fetch and calculate signals based on live market data
+ */
+export async function GET(request: NextRequest) {
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    // Fetch current prices from the prices API
+    const pricesResponse = await fetch("http://localhost:3000/api/prices", {
+      cache: "no-store",
+    });
+
+    if (!pricesResponse.ok) {
+      // Fallback to stored signals if prices API fails
+      return NextResponse.json(
+        {
+          signals: signalsStore,
+          updatedAt: storeLastUpdate,
+          source: "stored",
+        },
+        { status: 200 }
+      );
+    }
+
+    const pricesData = await pricesResponse.json();
+
+    // Transform prices data to signal generation format
+    const signalInputs = transformPricesToSignalInputs(pricesData);
+
+    // Signal configuration per symbol (customize as needed)
+    const signalConfigs: Record<string, Partial<SignalConfig>> = {
+      WTI: {
+        rsiOverbought: 75,
+        rsiOversold: 25,
+        timeframe: "1D",
+        trendWeight: 0.4,
+      },
+      BRENT: {
+        rsiOverbought: 75,
+        rsiOversold: 25,
+        timeframe: "1D",
+        trendWeight: 0.4,
+      },
+      "HEATING OIL": {
+        rsiOverbought: 70,
+        rsiOversold: 30,
+        timeframe: "4H",
+      },
+      "HENRY HUB GAS": {
+        rsiOverbought: 70,
+        rsiOversold: 30,
+        timeframe: "4H",
+        macdThreshold: 0.00005,
+      },
+      RBOB: {
+        rsiOverbought: 70,
+        rsiOversold: 30,
+        timeframe: "4H",
+      },
+      BTC: {
+        rsiOverbought: 70,
+        rsiOversold: 30,
+        timeframe: "1D",
+        trendWeight: 0.5,
+      },
+      ETH: {
+        rsiOverbought: 70,
+        rsiOversold: 30,
+        timeframe: "1D",
+        trendWeight: 0.5,
+      },
+      GOLD: {
+        rsiOverbought: 70,
+        rsiOversold: 30,
+        timeframe: "1D",
+        trendWeight: 0.3,
+      },
+      SILVER: {
+        rsiOverbought: 75,
+        rsiOversold: 25,
+        timeframe: "1D",
+        macdThreshold: 0.0002,
+      },
+      COPPER: {
+        rsiOverbought: 70,
+        rsiOversold: 30,
+        timeframe: "1D",
+      },
+    };
+
+    // Generate signals
+    const signals = generateSignalsFromPrices(signalInputs, signalConfigs);
+
+    // Convert to keyed format for response
+    const signalsResponse: Record<string, any> = {};
+    signals.forEach((signal) => {
+      signalsResponse[signal.symbol] = {
+        symbol: signal.symbol,
+        name: signal.name,
+        action: signal.action,
+        confidence: signal.confidence,
+        price: signal.price,
+        priceStr: signal.priceStr,
+        change: signal.change,
+        changePercent: signal.changePercent,
+        entryZone: signal.entryZone,
+        target: signal.target,
+        stopLoss: signal.stopLoss,
+        timeframe: signal.timeframe,
+        rationale: signal.rationale,
+        indicators: signal.indicators,
+        updatedAt: signal.updatedAt,
+      };
+    });
+
+    // Update store with calculated signals
+    signalsStore = signalsResponse;
+    storeLastUpdate = new Date().toISOString();
+
+    return NextResponse.json(
+      {
+        signals: signalsResponse,
+        updatedAt: storeLastUpdate,
+        source: "calculated",
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error generating signals:", error);
+
+    // Fallback to stored signals
+    return NextResponse.json(
+      {
+        signals: signalsStore,
+        updatedAt: storeLastUpdate,
+        source: "stored",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 200 }
+    );
+  }
+}
+
+/**
+ * POST: Manual signal updates with optional authentication
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // Validate authorization if SIGNALS_SECRET is set
+    const signalsSecret = process.env.SIGNALS_SECRET;
+    if (signalsSecret) {
+      const authHeader = request.headers.get("authorization");
+      if (!authHeader || authHeader !== `Bearer ${signalsSecret}`) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+    }
+
+    const body = await request.json();
+
+    // Handle single signal update
+    if (body.signal) {
+      const signal = body.signal;
+      signalsStore[signal.symbol] = signal;
+    }
+
+    // Handle batch signal updates
+    if (body.signals) {
+      Object.assign(signalsStore, body.signals);
+    }
+
+    storeLastUpdate = new Date().toISOString();
+
+    return NextResponse.json(
+      {
+        success: true,
+        updatedAt: storeLastUpdate,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error updating signals:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Transform prices data into signal generation input format
+ */
+function transformPricesToSignalInputs(
+  pricesData: any
+): Array<{
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  historicalData?: Array<{ close: number; high: number; low: number; volume: number }>;
+}> {
+  if (!pricesData || !pricesData.commodities) {
+    return [];
   }
 
-  // Accept either a full payload or a single signal object
-  if (body.signal) {
-    // Single signal update
-    const s = body.signal;
-    if (!s.symbol) return NextResponse.json({ error: 'signal.symbol required' }, { status: 400 });
-    store.signals[s.symbol] = { ...s, updatedAt: s.updatedAt ?? new Date().toISOString() };
-    store.updatedAt = new Date().toISOString();
-  } else if (body.signals) {
-    // Full payload replacement or merge
-    store.signals  = { ...store.signals, ...body.signals };
-    store.updatedAt = new Date().toISOString();
-  } else {
-    return NextResponse.json({ error: 'Provide signal or signals field' }, { status: 400 });
-  }
-
-  return NextResponse.json({ ok: true, updatedAt: store.updatedAt });
+  return pricesData.commodities
+    .map((commodity: any) => ({
+      symbol: commodity.symbol || commodity.name?.toUpperCase(),
+      name: commodity.name,
+      price: commodity.price,
+      change: commodity.change || 0,
+      changePercent: commodity.changePercent || 0,
+      historicalData: commodity.sparkline
+        ? commodity.sparkline.map((price: number, index: number) => ({
+            close: price,
+            high: price * 1.01,
+            low: price * 0.99,
+            volume: 1000000,
+          }))
+        : [],
+    }))
+    .filter((input: any) => input.historicalData.length > 0);
 }
