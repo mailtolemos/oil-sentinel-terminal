@@ -91,7 +91,11 @@ function SignalRow({ signal }: { signal: AssetSignal }) {
           <p className="text-[9px] text-terminal-text leading-relaxed">{signal.rationale}</p>
 
           {signal.indicators && (
-            <div className="text-[8px] font-['Orbitron'] text-terminal-dim">{signal.indicators}</div>
+            <div className="text-[8px] font-['Orbitron'] text-terminal-dim">
+              {Object.entries(signal.indicators).map(([key, val]) => (
+                <div key={key}>{key}: {typeof val === 'object' ? JSON.stringify(val) : val}</div>
+              ))}
+            </div>
           )}
 
           <div className="grid grid-cols-3 gap-1.5">
