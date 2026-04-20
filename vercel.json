@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/price-tracker?cron=true",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/recap?cron=true",
       "schedule": "0 7 * * *"
     },

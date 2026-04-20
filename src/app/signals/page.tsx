@@ -1,147 +1,255 @@
-import type { CommodityPrice } from '@/lib/types';
-import PriceStrip from '@/components/PriceStrip';
-import SignalsDetailPanel from '@/components/SignalsDetailPanel';
-import AssetSelector from '@/components/AssetSelector';
-import SignalAnalysisPanel from '@/components/SignalAnalysisPanel';
-import DecisionMatrix from '@/components/DecisionMatrix';
+'use client';
 
-export const revalidate = 30;
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
-async function getInitialPrices(): Promise<CommodityPrice[]> {
-  try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000';
-    const r = await fetch(`${baseUrl}/api/prices`, { cache: 'no-store' });
-    const d = await r.json();
-    return d.prices ?? [];
-  } catch {
-    return [];
-  }
+interface PriceAlert {
+  symbol: string;
+  direction: 'UP' | 'DOWN';
+  percentage: number;
+  oldPrice: number;
+  newPrice: number;
+  timestamp: string;
 }
 
-async function getSignals() {
-  try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000';
-    const r = await fetch(`${baseUrl}/api/signals`, { cache: 'no-store' });
-    const d = await r.json();
-    return d.signals ?? {};
-  } catch {
-    return {};
-  }
-}
+export default function SignalsPage() {
+  const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [trackedAssets] = useState(['BTC', 'ETH', 'HYPE', 'SOL', 'PYTH', 'FOGO', 'GOLD', 'SP500', 'BRENT', 'WTI']);
 
-const TICKER_ITEMS = [
-  '⚡ LIVE SIGNALS ENGINE — Real-time trading analysis',
-  '📊 RSI · MACD · Trend Analysis — Multi-indicator consensus',
-  '🎯 BUY/SELL/HOLD · Confidence 50-100% — Data-driven decisions',
-  '💰 Entry Zones · Target Prices · Stop Loss — Risk management built-in',
-  '🔔 Updates every 60 seconds — Automated signal generation',
-  '📈 Technical Analysis — Momentum · Trend · Volatility metrics',
-  '⚠️ Disclaimer: Signals for informational purposes only · Not financial advice',
-  '🌍 Supported: Crude Oil · Precious Metals · Cryptocurrencies · Indices',
-];
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const response = await fetch('/api/price-tracker');
+        const data = await response.json();
 
-const TICKER_STRING = TICKER_ITEMS.join('     ·     ');
+        if (data.alerts) {
+          // Parse alerts from the API response
+          const parsedAlerts: PriceAlert[] = data.alerts.map((alert: any) => {
+            // Extract data from HTML-formatted message
+            const match = alert.match(/([A-Z0-9]+).*?([\d.]+)%.*?\$([0-9.]+)\s*→\s*\$([0-9.]+)/);
+            if (match) {
+              return {
+                symbol: match[1],
+                percentage: parseFloat(match[2]),
+                direction: alert.includes('UP') ? 'UP' : 'DOWN',
+                oldPrice: parseFloat(match[3]),
+                newPrice: parseFloat(match[4]),
+                timestamp: new Date().toISOString(),
+              };
+            }
+            return null;
+          }).filter(Boolean);
 
-export default async function SignalsPage() {
-  const initialPrices = await getInitialPrices();
-  const signals = await getSignals();
+          setAlerts(parsedAlerts);
+        }
+
+        setLastUpdate(new Date().toLocaleTimeString());
+        setLoading(false);
+      } catch (error) {
+        console.error('Failed to fetch alerts:', error);
+        setLoading(false);
+      }
+    };
+
+    // Initial fetch
+    fetchAlerts();
+
+    // Poll every 60 seconds to match the price tracker interval
+    const interval = setInterval(fetchAlerts, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <>
-      {/* ── Mobile (< md) ───────────────────────────────── */}
-      <div className="md:hidden p-4 space-y-4">
-        <div className="text-center space-y-2">
-          <h1 className="text-[24px] font-['Orbitron'] font-bold text-terminal-bright">LIVE SIGNALS</h1>
-          <p className="text-[11px] text-terminal-dim">Trading Analysis Terminal</p>
+    <div className="min-h-screen flex flex-col bg-terminal-bg overflow-hidden font-mono">
+      {/* Top bar */}
+      <div className="shrink-0 h-10 border-b border-terminal-border bg-terminal-panel flex items-center px-5 gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-terminal-red animate-pulse" />
+          <span className="text-[11px] font-['Orbitron'] font-bold tracking-[0.25em] text-terminal-bright">
+            PABLO<span style={{ color: 'var(--red)' }}>SIGNALS</span>
+          </span>
         </div>
-        <SignalsDetailPanel signals={signals} isMobile />
+        <div className="h-4 w-px bg-terminal-border" />
+        <span className="text-[9px] font-['Orbitron'] text-terminal-dim tracking-widest uppercase">
+          Real-Time Price Tracking Bot
+        </span>
+        <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-terminal-red animate-pulse" />
+            <span className="text-[8px] font-['Orbitron'] font-bold text-terminal-red tracking-wider">LIVE</span>
+          </div>
+          <span className="text-[8px] text-terminal-dim font-['Orbitron']">
+            Last update: {lastUpdate}
+          </span>
+        </div>
       </div>
 
-      {/* ── Desktop (≥ md) ──────────────────────────────── */}
-      <div className="hidden md:flex flex-col h-screen overflow-hidden bg-terminal-bg transition-colors duration-300">
-
-        {/* Price strip */}
-        <div className="shrink-0 h-[62px] border-b border-terminal-border">
-          <PriceStrip initialPrices={initialPrices} />
+      {/* Main content */}
+      <div className="flex-1 flex flex-col gap-5 p-8 overflow-auto">
+        {/* Header section */}
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <h1 className="text-[32px] font-['Orbitron'] font-bold tracking-[0.12em]"
+              style={{ color: 'var(--bright)', textShadow: '0 0 30px rgba(255,100,0,0.2)' }}>
+              PRICE TRACKER SIGNALS
+            </h1>
+            <p className="text-[11px] text-terminal-dim font-['Orbitron'] tracking-widest">
+              Monitoring {trackedAssets.length} assets for &gt;0.75% moves in 5-minute windows
+            </p>
+          </div>
+          <Link href="/"
+            className="px-4 py-2 rounded border text-[10px] font-['Orbitron'] font-bold tracking-widest transition-all"
+            style={{
+              background: 'rgba(0,200,240,0.08)',
+              borderColor: 'rgba(0,200,240,0.3)',
+              color: 'var(--blue)',
+            }}>
+            ← BACK TO HOME
+          </Link>
         </div>
 
-        {/* Main 3-column grid */}
-        <div className="flex-1 min-h-0 grid grid-cols-[280px_1fr_380px] overflow-hidden">
-
-          {/* Left: Asset Selector */}
-          <div className="panel border-r border-terminal-border overflow-hidden flex flex-col">
-            <AssetSelector signals={signals} prices={initialPrices} />
-          </div>
-
-          {/* Center: Signal Analysis */}
-          <div className="flex flex-col overflow-hidden border-r border-terminal-border">
-            <div className="flex-[60] min-h-0 panel border-b border-terminal-border overflow-hidden">
-              <SignalAnalysisPanel signals={signals} />
-            </div>
-            <div className="flex-[40] min-h-0 panel overflow-hidden">
-              <SignalsDetailPanel signals={signals} />
-            </div>
-          </div>
-
-          {/* Right: Decision Matrix & Info */}
-          <div className="flex flex-col overflow-hidden">
-            <div className="flex-[50] min-h-0 panel border-b border-terminal-border overflow-hidden">
-              <DecisionMatrix signals={signals} />
-            </div>
-            <div className="flex-[50] min-h-0 panel overflow-hidden">
-              <div className="h-full flex flex-col p-3 text-[9px] text-terminal-dim space-y-2 overflow-y-auto">
-                <div className="text-terminal-bright font-['Orbitron'] font-bold tracking-wider mb-2">INFO</div>
-                <div className="space-y-1.5 text-[8px] leading-relaxed">
-                  <div>
-                    <strong className="text-terminal-blue">Signal Generation:</strong> Automated technical analysis from live market prices
-                  </div>
-                  <div>
-                    <strong className="text-terminal-green">Confidence:</strong> 50-100% based on indicator consensus
-                  </div>
-                  <div>
-                    <strong className="text-terminal-amber">Indicators:</strong> RSI, MACD, Moving Averages, Trend Analysis
-                  </div>
-                  <div>
-                    <strong className="text-terminal-red">Timeframe:</strong> 1D (daily) — suitable for swing trading
-                  </div>
-                  <div className="pt-2 border-t border-terminal-border/50">
-                    <strong className="text-terminal-red">⚠️ Disclaimer:</strong> These signals are for informational purposes only and do not constitute financial advice. Trading carries risk of loss.
-                  </div>
-                </div>
+        {/* Tracked assets section */}
+        <div className="grid grid-cols-5 gap-2">
+          {trackedAssets.map(asset => (
+            <div key={asset}
+              className="p-3 rounded border text-center"
+              style={{
+                background: 'var(--surface)',
+                borderColor: 'var(--border)',
+              }}>
+              <div className="text-[9px] font-['Orbitron'] text-terminal-dim tracking-wider">
+                {asset}
+              </div>
+              <div className="text-[11px] font-bold font-['Orbitron'] mt-1" style={{ color: 'var(--blue)' }}>
+                WATCHING
               </div>
             </div>
+          ))}
+        </div>
+
+        {/* Alerts section */}
+        <div className="mt-6">
+          <div className="text-[12px] font-['Orbitron'] font-bold tracking-widest mb-3"
+            style={{ color: 'var(--bright)' }}>
+            ACTIVE ALERTS
+          </div>
+
+          {loading ? (
+            <div className="text-[10px] text-terminal-dim font-['Orbitron'] tracking-wider">
+              Loading price data...
+            </div>
+          ) : alerts.length === 0 ? (
+            <div className="p-6 rounded border text-center"
+              style={{
+                background: 'rgba(0,200,240,0.02)',
+                borderColor: 'rgba(0,200,240,0.15)',
+              }}>
+              <div className="text-[10px] text-terminal-dim font-['Orbitron'] tracking-widest">
+                NO ALERTS DETECTED
+              </div>
+              <div className="text-[9px] text-terminal-dim mt-2">
+                Monitoring for price movements &gt;0.75% in 5-minute windows
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {alerts.map((alert, idx) => (
+                <div key={idx}
+                  className="p-4 rounded border flex items-center justify-between transition-all"
+                  style={{
+                    background: alert.direction === 'UP'
+                      ? 'rgba(0,200,100,0.08)' : 'rgba(255,100,0,0.08)',
+                    borderColor: alert.direction === 'UP'
+                      ? 'rgba(0,200,100,0.3)' : 'rgba(255,100,0,0.3)',
+                  }}>
+
+                  <div className="flex items-center gap-4">
+                    <span className="text-[20px]">
+                      {alert.direction === 'UP' ? '🟢 📈' : '🔴 📉'}
+                    </span>
+                    <div>
+                      <div className="text-[12px] font-['Orbitron'] font-bold tracking-wider">
+                        {alert.symbol}
+                      </div>
+                      <div className="text-[10px] text-terminal-dim font-['Orbitron'] mt-0.5">
+                        ${alert.oldPrice.toFixed(2)} → ${alert.newPrice.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-[14px] font-['Orbitron'] font-bold"
+                      style={{ color: alert.direction === 'UP' ? '#00c864' : '#ff6400' }}>
+                      {alert.direction === 'UP' ? '+' : '-'}{alert.percentage.toFixed(2)}%
+                    </div>
+                    <div className="text-[8px] text-terminal-dim font-['Orbitron'] mt-0.5">
+                      {alert.direction} MOVE IN 5MIN
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Statistics section */}
+        <div className="mt-8 grid grid-cols-3 gap-3">
+          <div className="p-4 rounded border"
+            style={{
+              background: 'var(--surface)',
+              borderColor: 'var(--border)',
+            }}>
+            <div className="text-[9px] font-['Orbitron'] text-terminal-dim tracking-widest">ACTIVE ALERTS</div>
+            <div className="text-[20px] font-['Orbitron'] font-bold mt-2"
+              style={{ color: 'var(--red)' }}>
+              {alerts.length}
+            </div>
+          </div>
+
+          <div className="p-4 rounded border"
+            style={{
+              background: 'var(--surface)',
+              borderColor: 'var(--border)',
+            }}>
+            <div className="text-[9px] font-['Orbitron'] text-terminal-dim tracking-widest">ASSETS TRACKED</div>
+            <div className="text-[20px] font-['Orbitron'] font-bold mt-2"
+              style={{ color: 'var(--blue)' }}>
+              {trackedAssets.length}
+            </div>
+          </div>
+
+          <div className="p-4 rounded border"
+            style={{
+              background: 'var(--surface)',
+              borderColor: 'var(--border)',
+            }}>
+            <div className="text-[9px] font-['Orbitron'] text-terminal-dim tracking-widest">THRESHOLD</div>
+            <div className="text-[20px] font-['Orbitron'] font-bold mt-2"
+              style={{ color: 'var(--amber)' }}>
+              &gt;0.75%
+            </div>
           </div>
         </div>
 
-        {/* Bottom ticker */}
-        <div className="shrink-0 h-7 border-t border-terminal-border bg-terminal-surface flex items-center overflow-hidden">
-          <div className="shrink-0 px-3 border-r border-terminal-border h-full flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-terminal-green animate-pulse" />
-            <span className="text-[9px] font-['Orbitron'] text-terminal-green font-bold tracking-wider">LIVE</span>
-          </div>
-          <div className="flex-1 overflow-hidden relative">
-            <div className="ticker-text text-[10px] text-terminal-text font-medium">
-              {TICKER_STRING}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{TICKER_STRING}
-            </div>
-          </div>
-          <div className="shrink-0 px-3 border-l border-terminal-border h-full flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--green)' }} />
-              <span className="text-[7px] font-['Orbitron'] font-bold" style={{ color: 'var(--green)' }}>PYTH</span>
-              <span className="text-[7px] text-terminal-dim font-['Orbitron']">LIVE DATA</span>
-            </div>
-            <div className="h-3 w-px bg-terminal-border" />
-            <a href="/" className="text-[8px] font-['Orbitron'] text-terminal-dim hover:text-terminal-blue transition-colors tracking-wider">
-              ← HOME
-            </a>
-            <span className="text-[9px] text-terminal-dim font-['Orbitron'] tracking-wider">LIVE SIGNALS</span>
+        {/* Info section */}
+        <div className="mt-8 p-4 rounded border text-[9px] space-y-2"
+          style={{
+            background: 'rgba(0,200,240,0.02)',
+            borderColor: 'rgba(0,200,240,0.15)',
+          }}>
+          <div className="font-['Orbitron'] font-bold text-terminal-bright">ℹ️ HOW IT WORKS</div>
+          <div className="text-terminal-dim space-y-1">
+            <div>• Bot monitors {trackedAssets.length} assets: {trackedAssets.join(', ')}</div>
+            <div>• Checks for price movements &gt;0.75% over 5-minute windows</div>
+            <div>• Alerts are sent to Telegram bot in real-time</div>
+            <div>• Price data is checked every 60 seconds</div>
+            <div>• All times are in UTC</div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
