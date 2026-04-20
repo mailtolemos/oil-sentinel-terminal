@@ -120,7 +120,9 @@ export async function GET(request: NextRequest) {
     };
 
     // Generate signals
+    console.log("Attempting to generate signals from", signalInputs.length, "inputs");
     const signals = generateSignalsFromPrices(signalInputs, signalConfigs);
+    console.log("Signals generated:", signals.length);
 
     // Convert to keyed format for response
     const signalsResponse: Record<string, any> = {};
@@ -153,23 +155,26 @@ export async function GET(request: NextRequest) {
         signals: signalsResponse,
         updatedAt: storeLastUpdate,
         source: "calculated",
+        count: Object.keys(signalsResponse).length,
       },
       { status: 200 }
     );
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
     console.error("Error generating signals:", errorMsg);
-    console.error("Full error:", error);
+    console.error("Stack:", error instanceof Error ? error.stack : "no stack");
 
-    // Fallback to stored signals
+    // Return error details so we can debug
     return NextResponse.json(
       {
         signals: signalsStore,
         updatedAt: storeLastUpdate,
-        source: "stored",
+        source: "error",
         error: errorMsg,
         debug: {
           pricesDataReceived: !!pricesData,
+          pricesDataKeys: pricesData ? Object.keys(pricesData) : [],
+          pricesCount: (pricesData?.prices || []).length,
           signalInputsCount: signalInputs?.length || 0,
         },
       },
