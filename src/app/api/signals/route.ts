@@ -25,6 +25,9 @@ let storeLastUpdate: string = new Date().toISOString();
  * GET: Fetch and calculate signals based on live market data
  */
 export async function GET(request: NextRequest) {
+  let pricesData: any = null;
+  let signalInputs: any[] = [];
+
   try {
     // Fetch current prices from the prices API
     const baseUrl = process.env.VERCEL_URL
@@ -36,6 +39,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!pricesResponse.ok) {
+      console.warn(`Prices API returned ${pricesResponse.status}, using stored signals`);
       // Fallback to stored signals if prices API fails
       return NextResponse.json(
         {
@@ -47,10 +51,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const pricesData = await pricesResponse.json();
+    pricesData = await pricesResponse.json();
+    console.log("Prices data received, item count:", pricesData.prices?.length || 0);
 
     // Transform prices data to signal generation format
-    const signalInputs = transformPricesToSignalInputs(pricesData);
+    signalInputs = transformPricesToSignalInputs(pricesData);
+    console.log("Signal inputs created:", signalInputs.length);
 
     // Signal configuration per symbol (customize as needed)
     const signalConfigs: Record<string, Partial<SignalConfig>> = {
@@ -151,7 +157,9 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Error generating signals:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+    console.error("Error generating signals:", errorMsg);
+    console.error("Full error:", error);
 
     // Fallback to stored signals
     return NextResponse.json(
@@ -159,7 +167,11 @@ export async function GET(request: NextRequest) {
         signals: signalsStore,
         updatedAt: storeLastUpdate,
         source: "stored",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMsg,
+        debug: {
+          pricesDataReceived: !!pricesData,
+          signalInputsCount: signalInputs?.length || 0,
+        },
       },
       { status: 200 }
     );
