@@ -7,7 +7,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { generateSignalsFromPrices, SignalConfig } from "@/lib/signalEngine";
+import { generateSignalsFromPrices, SignalConfig, TradeSignal } from "@/lib/signalEngine";
+
+// Type exports for frontend components
+export type AssetSignal = TradeSignal;
+export interface SignalsPayload {
+  signals: Record<string, AssetSignal>;
+  updatedAt: string;
+  source?: string;
+}
 
 // In-memory store for manual signals (fallback/manual overrides)
 let signalsStore: Record<string, any> = {};
